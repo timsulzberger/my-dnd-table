@@ -1,38 +1,118 @@
-.App {
-  text-align: center;
+/* Add this to your App.css */
+
+/* Overall layout container */
+.app-layout {
+  display: flex;
+  padding: 20px;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
+/* Container for the Unassigned column */
+.unassigned-container {
+  display: flex;
+  flex-direction: column; /* Stack items vertically */
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  min-width: 150px; /* Adjust width as needed */
+  margin-right: 20px; /* Add space between unassigned and main content */
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
+/* Container for the Drummer and main Left/Right columns */
+.main-content-container {
+    display: flex;
+    flex-direction: column; /* Stack top, main, and bottom containers vertically */
+    flex-grow: 1; /* Allow this container to take available space */
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+
+/* Style for the top (Drummer) container */
+.top-container {
+  display: flex; /* Use flexbox to center the single tile */
+  justify-content: center; /* Center horizontally */
+  align-items: center; /* Center vertically if needed */
+  width: 100%; /* Take full width */
+  margin-bottom: 20px; /* Add space between top tile and columns */
+}
+
+/* Modify the main container to arrange Left/Right columns horizontally */
+.container {
+  display: flex;
+  justify-content: space-around;
+  /* Removed padding here as it's on the app-layout container */
+  /* Removed flex-grow here as main-content-container has it */
+  margin-bottom: 20px; /* Add space between main columns and bottom tile */
+}
+
+/* Ensure columns within the main container also use flex or adjust width */
+.column {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  min-width: 200px;
+  flex-grow: 1; /* Allow columns to grow */
+  margin: 0 10px; /* Add some space between columns */
+}
+
+/* New style for the bottom (Sweep) container */
+.bottom-container {
+  display: flex; /* Use flexbox to center the single tile */
+  justify-content: center; /* Center horizontally */
+  align-items: center; /* Center vertically if needed */
+  width: 100%; /* Take full width */
+  margin-top: 20px; /* Add space between main columns and bottom tile */
+}
+
+/* Basic tile styling (some styles moved inline in App.js) */
+/* .tile {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background-color: #456C86;
   color: white;
+  padding: 16px;
+  user-select: none;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+} */
+
+.tile-header {
+    font-weight: bold;
+    margin-bottom: 8px;
 }
 
-.App-link {
-  color: #61dafb;
+.tile-number {
+  font-size: 0.8em;
+  color: #eee;
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.tile-content {
+  font-weight: bold;
+}
+
+.tile-note {
+  font-size: 0.9em;
+  color: #eee;
+}
+
+.paddler-name-container {
+    margin-top: 8px;
+}
+
+.paddler-name-container label {
+    font-size: 0.9em;
+    color: #eee;
+    margin-bottom: 4px;
+    display: block; /* Make label a block element */
+}
+
+.paddler-name-container input {
+    padding: 4px;
+    border-radius: 2px;
+    border: 1px solid #ccc;
+    font-size: 1em;
+    color: #333;
+    width: calc(100% - 10px); /* Adjust input width */
 }
