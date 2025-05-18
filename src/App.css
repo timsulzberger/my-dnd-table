@@ -7,7 +7,7 @@
 }
 
 /* Container for the Unassigned column */
-.unassigned-container {
+.unassigned-column { /* Renamed from .unassigned-container */
   display: flex;
   flex-direction: column; /* Stack items vertically */
   padding: 10px;
@@ -17,66 +17,48 @@
   margin-right: 20px; /* Add space between unassigned and main content */
 }
 
-/* Container for the Drummer and main Left/Right columns */
+/* Container for the Drummer, main grid, and Sweep */
 .main-content-container {
     display: flex;
-    flex-direction: column; /* Stack top, main, and bottom containers vertically */
+    flex-direction: column; /* Stack drummer, grid, and sweep vertically */
     flex-grow: 1; /* Allow this container to take available space */
 }
 
+/* Style for the top (Drummer) container - now a droppable zone */
+/* .top-container is no longer needed as DroppableZone handles its own styling */
 
-/* Style for the top (Drummer) container */
-.top-container {
-  display: flex; /* Use flexbox to center the single tile */
-  justify-content: center; /* Center horizontally */
-  align-items: center; /* Center vertically if needed */
-  width: 100%; /* Take full width */
-  margin-bottom: 20px; /* Add space between top tile and columns */
+/* New style for the main grid container (Left/Right Rows) */
+.main-grid-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* Two columns of equal width */
+    gap: 8px; /* Space between grid items (droppable zones) */
+    margin-bottom: 20px; /* Space between grid and sweep */
 }
 
-/* Modify the main container to arrange Left/Right columns horizontally */
-.container {
-  display: flex;
-  justify-content: space-around;
-  /* Removed padding here as it's on the app-layout container */
-  /* Removed flex-grow here as main-content-container has it */
-  margin-bottom: 20px; /* Add space between main columns and bottom tile */
+
+/* New style for the bottom (Sweep) container - now a droppable zone */
+/* .bottom-container is no longer needed as DroppableZone handles its own styling */
+
+
+/* Style for individual droppable zones */
+.droppable-zone {
+    /* Styles moved to the DroppableZone component's inline style */
+    /* Add any additional styles here if needed */
 }
 
-/* Ensure columns within the main container also use flex or adjust width */
-.column {
-  display: flex;
-  flex-direction: column;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  min-width: 200px;
-  flex-grow: 1; /* Allow columns to grow */
-  margin: 0 10px; /* Add some space between columns */
+.droppable-zone.is-over {
+    /* Styles moved to the DroppableZone component's inline style */
 }
 
-/* New style for the bottom (Sweep) container */
-.bottom-container {
-  display: flex; /* Use flexbox to center the single tile */
-  justify-content: center; /* Center horizontally */
-  align-items: center; /* Center vertically if needed */
-  width: 100%; /* Take full width */
-  margin-top: 20px; /* Add space between main columns and bottom tile */
-}
 
 /* Basic tile styling (some styles moved inline in App.js) */
-/* .tile {
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  background-color: #456C86;
-  color: white;
-  padding: 16px;
-  user-select: none;
-  cursor: grab;
-  display: flex;
-  flex-direction: column;
-} */
+.tile {
+  width: 100%; /* Tiles should fill their droppable zone */
+  height: 100%; /* Tiles should fill their droppable zone */
+  box-sizing: border-box; /* Include padding and border in element's total width and height */
+  /* Other styles like padding, margin-bottom, background-color, color, border-radius, cursor, display, flexDirection are inlined */
+}
+
 
 .tile-header {
     font-weight: bold;
