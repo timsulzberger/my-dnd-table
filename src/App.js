@@ -9,7 +9,7 @@ import {
   KeyboardSensor, // Sensor that responds to keyboard events
   // Import collision detection strategies
   closestCenter, // Collision detection algorithm: finds the closest droppable center
-  rectIntersection, // Collision detection algorithm: detects overlapping rectangles - Re-imported for custom strategy
+  rectIntersection, // Collision detection algorithm: detects overlapping rectangles
   useDroppable, // Hook to make an element a droppable zone
 } from '@dnd-kit/core';
 // Import necessary hooks and utilities from @dnd-kit/sortable
@@ -39,6 +39,10 @@ const POSITIONS = {
     BENCH: 'bench', // Prefix for bench positions (e.g., 'bench-1-left') - Renamed from ROW
 };
 
+// Define the possible preference options
+const PREFERENCE_OPTIONS = ['Null', 'Left', 'Right', 'Either'];
+
+
 // Helper function to generate unique IDs for bench positions - Updated to use 'bench'
 const generateBenchPositionId = (row, side) => `${POSITIONS.BENCH}-${row}-${side}`;
 
@@ -67,7 +71,7 @@ const initialTiles = Array.from({ length: 22 }, (v, k) => {
     id: tileId,
     // Removed original content field as it's no longer displayed
     // content: `Tile ${k + 1}`, // Content displayed on the tile
-    preference: ``, // Added preference field, initially empty
+    preference: 'Null', // Added preference field, initially 'Null'
     positionId: positionId, // Stores the tile's current position ID
     paddlerName: `Person ${k + 1}`, // Default paddler name
   };
@@ -94,15 +98,16 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
 
   // Tailwind classes for styling the tile
   // baseClasses: Common styles for all tiles (padding, rounded corners, cursor, flex layout, transition, solid black border)
-  const baseClasses = `p-2 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-black`; // Reduced padding
+  // Reduced padding for tighter tiles
+  const baseClasses = `p-1 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-black`;
   // draggingClasses: Styles applied when the tile is being dragged (opacity, background color, border consistency, shadow)
   const draggingClasses = isDragging ? 'opacity-50 bg-gray-200 border-black' : 'opacity-100 bg-white shadow-sm';
 
   // positionSpecificClasses: Styles that vary based on the tile's current position (margin, width, text alignment)
-  // Reduced mb-2 to mb-1 for tighter vertical spacing between tiles in lists
-  const positionSpecificClasses = currentPositionId === POSITIONS.UNASSIGNED ? 'mb-1 w-full max-w-[150px] mx-auto text-left' // Styles for tiles in the Unassigned column
-                                : (currentPositionId === POSITIONS.DRUMMER || currentPositionId === POSITIONS.SWEEP ? 'mb-0 w-full max-w-[calc(100%-16px)] mx-auto text-center' // Styles for tiles in Drummer or Sweep (single-tile zones), adjusted calc
-                                : 'mb-1 text-left w-full'); // Styles for tiles in the row grid positions, added w-full
+  // Adjusted width and margin for different positions
+  const positionSpecificClasses = currentPositionId === POSITIONS.UNASSIGNED ? 'mb-1 w-full max-w-[120px] mx-auto text-left text-xs' // Styles for tiles in the Unassigned column - Smaller max-w and font
+                                : (currentPositionId === POSITIONS.DRUMMER || currentPositionId === POSITIONS.SWEEP ? 'mb-0 w-full max-w-[calc(100%-16px)] mx-auto text-center text-sm' // Styles for tiles in Drummer or Sweep (single-tile zones) - Slightly smaller font
+                                : 'mb-1 text-left w-full text-sm'); // Styles for tiles in the row grid positions - Slightly smaller font
 
   // Inline style object for applying transform and transition provided by useSortable
   const style = {
@@ -110,7 +115,7 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
     transition, // Applies the CSS transition for smooth animation
   };
 
-  // Prevents the drag interaction from starting when interacting with the input field
+  // Prevents the drag interaction from starting when interacting with the input field or select dropdown
   const handleInputMouseDown = (event) => {
       event.stopPropagation(); // Stops the event from bubbling up to the draggable div
   };
@@ -132,7 +137,8 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
   }
 
   // Extract the tile number from the id (e.g., "tile-0" -> 1, "tile-21" -> 22)
-  const tileNumber = id.split('-')[1] ? parseInt(id.split('-')[1]) + 1 : null;
+  // This value is kept for potential backend use but not displayed in the GUI
+  // const tileNumber = id.split('-')[1] ? parseInt(id.split('-')[1]) + 1 : null;
 
 
   return (
@@ -147,45 +153,54 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
       {/* Container for main content, using flex-col for vertical stacking */}
       <div className="flex flex-col flex-grow"> {/* flex-grow allows this section to take up space */}
           {/* Display the formatted header */}
-          <div className="font-semibold mb-2 text-gray-700">{headerText}</div>
+          {/* Hide header for unassigned tiles */}
+          {currentPositionId !== POSITIONS.UNASSIGNED && (
+              <div className="font-semibold mb-1 text-gray-700 text-xs">{headerText}</div> // Smaller font for header
+          )}
 
-          {/* Paddler Name Input - Moved to the top */}
-          <div className="mt-1 mb-2" onMouseDown={handleInputMouseDown}> {/* Container for the input, prevents drag start, added margin-bottom */}
-            <label htmlFor={`paddler-${id}`} className="block text-xs text-gray-600 mb-1">Name:</label> {/* Label changed to "Name:" */}
+          {/* Paddler Name Input - Using flexbox for label and input on same line */}
+          {/* Adjusted spacing and width handling */}
+          <div className="mt-0.5 mb-0.5 flex items-center" onMouseDown={handleInputMouseDown}> {/* Added flex and items-center */}
+            <label htmlFor={`paddler-${id}`} className="block text-xs text-gray-600 mr-1 shrink-0">Name:</label> {/* Added mr-1 for spacing, shrink-0 to prevent label shrinking */}
             <input
               id={`paddler-${id}`} // Unique ID for the input, linked to the label
               type="text"
               value={paddlerName} // Controlled input value
               onChange={(e) => onPaddlerNameChange(id, e.target.value)} // Call parent handler on change
-              className="p-1 rounded border border-gray-300 text-sm text-gray-800 w-full focus:outline-none focus:ring-1 focus:ring-blue-500" // Tailwind classes for input styling and focus effect
+              // Removed flex-grow, added w-auto and min-w-0 for better flex behavior, removed focus outline
+              className="p-0.5 rounded border border-gray-300 text-xs text-gray-800 w-auto min-w-0 outline-none" // Removed flex-grow, added w-auto min-w-0, outline-none
             />
           </div>
 
-          {/* Preference Input Field */}
-          <div className="mt-1 mb-2" onMouseDown={handleInputMouseDown}> {/* Container for the input, prevents drag start, added margin-bottom */}
-            <label htmlFor={`preference-${id}`} className="block text-xs text-gray-600 mb-1">Preference:</label> {/* Label for the preference field */}
-            <input
-              id={`preference-${id}`} // Unique ID for the input
-              type="text"
-              value={preference} // Controlled input value
+          {/* Preference Dropdown - Using flexbox for label and select on same line */}
+          {/* Adjusted spacing and width handling */}
+          <div className="mt-0.5 mb-0.5 flex items-center" onMouseDown={handleInputMouseDown}> {/* Added flex and items-center */}
+            <label htmlFor={`preference-${id}`} className="block text-xs text-gray-600 mr-1 shrink-0">Preference:</label> {/* Label for the preference field, added mr-1, shrink-0 */}
+            <select
+              id={`preference-${id}`} // Unique ID for the dropdown
+              value={preference} // Controlled dropdown value
               onChange={(e) => onPreferenceChange(id, e.target.value)} // Call parent handler on change
-              className="p-1 rounded border border-gray-300 text-sm text-gray-800 w-full focus:outline-none focus:ring-1 focus:ring-blue-500" // Tailwind classes for input styling and focus effect
-            />
+              // Removed flex-grow, added w-auto and min-w-0 for better flex behavior, removed focus outline
+              className="p-0.5 rounded border border-gray-300 text-xs text-gray-800 w-auto min-w-0 outline-none" // Removed flex-grow, added w-auto min-w-0, outline-none
+            >
+                {/* Map over the preference options to create dropdown options */}
+                {PREFERENCE_OPTIONS.map(option => (
+                    <option key={option} value={option}>{option}</option>
+                ))}
+            </select>
           </div>
 
-          {/* Removed the div displaying the original tile content */}
-          {/* <div className="text-gray-800">{content}</div> */}
-          {/* Removed the div displaying the original tile note */}
-          {/* <div className="text-gray-600 text-sm">{note}</div> */}
+          {/* Hide original content and note for unassigned tiles */}
+          {currentPositionId !== POSITIONS.UNASSIGNED && (
+              <>
+                  <div className="text-gray-800 text-xs">{/*content*/}</div> {/* Smaller content font */}
+                  <div className="text-gray-600 text-[8pt]">{/*note*/}</div> {/* Even smaller note font */}
+              </>
+          )}
 
       </div>
 
-      {/* Tile Number at bottom left */}
-      {tileNumber !== null && ( // Only render if tileNumber is successfully extracted
-        <div className="absolute bottom-1 left-1 text-gray-400 text-[6pt] py-0.5"> {/* Absolute positioning, bottom/left offset, lighter grey text, 6pt font, vertical padding */}
-          {`Tile ID ${tileNumber}`} {/* Display "Tile ID" followed by the number */}
-        </div>
-      )}
+      {/* Removed the div that displayed the Tile ID */}
     </div>
   );
 }
@@ -197,8 +212,8 @@ function DroppableZone({ children, id, label, occupiedTileId }) {
 
   // Tailwind classes for styling the droppable zone
   // baseClasses: Common styles (padding, margin, rounded corners, flex layout, transition, dotted gray border)
-  // Removed min-height to allow grid/flex to control height, adjusted padding
-  const baseClasses = `p-1 m-0.5 rounded-md flex flex-col items-center justify-center transition-colors duration-200 ease-in-out border border-dotted border-gray-400`;
+  // Reduced padding and margin for tighter zones
+  const baseClasses = `p-0.5 m-0.5 rounded-md flex flex-col items-center justify-center transition-colors duration-200 ease-in-out border border-dotted border-gray-400`;
   // stateClasses: Styles that change based on drag state (border and background color when dragging over, or based on occupied status)
   // Updated background colors to light grey shades
   const stateClasses = isOver ? 'border-2 border-black bg-gray-200' : (occupiedTileId ? 'bg-gray-100 border-gray-300' : 'bg-gray-50 border-gray-200');
@@ -210,7 +225,7 @@ function DroppableZone({ children, id, label, occupiedTileId }) {
       className={`${baseClasses} ${stateClasses} h-full`} // Combine all Tailwind classes, added h-full
     >
       {/* Show the label if the zone is empty */}
-      {!occupiedTileId && <div className="text-gray-600 text-sm">{label}</div>}
+      {!occupiedTileId && <div className="text-gray-600 text-xs">{label}</div>} {/* Smaller label font */}
       {/* Render the children (the tile) if it's assigned to this zone */}
       {children}
     </div>
@@ -218,16 +233,31 @@ function DroppableZone({ children, id, label, occupiedTileId }) {
 }
 
 // Component for the Unassigned column (which is a sortable list and a droppable zone)
-function UnassignedColumn({ children, id, title, tileIds }) {
+function UnassignedColumn({ children, id, title, tileIds, selectedFilterPreferences, onFilterChange }) {
     // useDroppable hook makes the element a droppable target
     const { setNodeRef, isOver } = useDroppable({ id }); // The unique ID of the Unassigned column
 
     // Tailwind classes for styling the Unassigned column
     // baseClasses: Common styles (flex layout, padding, dotted gray border, rounded corners, min width, right margin, center alignment)
-    // Reduced p-4 to p-2 for tighter padding around the tiles within the column
-    const baseClasses = `flex flex-col p-2 border border-dotted border-gray-400 rounded-md min-w-[180px] mr-8 items-center`;
+    // Reduced padding, min-width, and right margin
+    const baseClasses = `flex flex-col p-1 border border-dotted border-gray-400 rounded-md min-w-[150px] mr-4 items-center`;
     // stateClasses: Styles that change based on drag state (background color when dragging over)
     const stateClasses = isOver ? 'bg-gray-200' : 'bg-gray-100';
+
+    // Handler for the multi-select dropdown change
+    const handleSelectChange = (event) => {
+        const options = event.target.options;
+        const selectedValues = [];
+        // Iterate through options and add selected ones to the array
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].selected) {
+                selectedValues.push(options[i].value);
+            }
+        }
+        // Call the parent handler with the array of selected values
+        onFilterChange(selectedValues);
+    };
+
 
     return (
         // The main div for the Unassigned column, connected to dnd-kit via setNodeRef
@@ -236,8 +266,28 @@ function UnassignedColumn({ children, id, title, tileIds }) {
           className={`${baseClasses} ${stateClasses}`} // Combine all Tailwind classes
         >
           {/* Display the column title */}
-          {/* Reduced mb-4 to mb-2 for tighter spacing below the title */}
-          <h2 className="text-xl font-semibold mb-2 text-gray-800">{title}</h2>
+          {/* Reduced font size and margin for the title */}
+          <h2 className="text-lg font-semibold mb-1 text-gray-800">{title}</h2>
+
+          {/* Preference Filter Dropdown for Unassigned Column */}
+          <div className="mb-2 w-full px-1"> {/* Added padding-x for alignment */}
+              <label htmlFor="preference-filter" className="block text-xs text-gray-600 mb-0.5">Filter by Preference:</label> {/* Label for the filter */}
+              <select
+                  id="preference-filter" // Unique ID for the filter dropdown
+                  multiple={true} // Enable multi-select
+                  value={selectedFilterPreferences} // Controlled input value (array of selected options)
+                  onChange={handleSelectChange} // Call local handler on change
+                  className="p-1 rounded border border-gray-300 text-sm text-gray-800 w-full focus:outline-none focus:ring-1 focus:ring-blue-500 h-24" // Styling, added h-24 for visible options
+              >
+                  {/* Add an option to show all (empty value) */}
+                  <option value="">Show All</option>
+                  {/* Map over the preference options to create dropdown options */}
+                  {PREFERENCE_OPTIONS.map(option => (
+                      <option key={option} value={option}>{option}</option>
+                  ))}
+              </select>
+          </div>
+
           {/* SortableContext makes the children within this context sortable */}
           {/* items: Array of IDs of the sortable items */}
           {/* strategy: The sorting algorithm to use */}
@@ -278,6 +328,8 @@ function App() {
   // State to hold the current section name for the AppBar
   // eslint-disable-next-line no-unused-vars
   const [currentSection, setCurrentSection] = useState('Boat Layout'); // Default section name - setCurrentSection is currently unused, but kept for future navigation features
+  // State to hold the selected filter preferences for the unassigned column (array for multi-select)
+  const [selectedFilterPreferences, setSelectedFilterPreferences] = useState([]); // Initialize with an empty array
 
 
   // Effect hook to populate the columns state based on the initialTiles data
@@ -337,13 +389,18 @@ function App() {
     );
   };
 
-  // Handler for changes to the Preference input field
+  // Handler for changes to the Preference input field (now a dropdown)
   const handlePreferenceChange = (tileId, newPreference) => {
       setTiles(prevTiles =>
           prevTiles.map(tile =>
               tile.id === tileId ? { ...tile, preference: newPreference } : tile
           )
       );
+  };
+
+  // Handler for changes to the Unassigned filter dropdown
+  const handleUnassignedFilterChange = (selectedValues) => {
+      setSelectedFilterPreferences(selectedValues);
   };
 
 
@@ -378,6 +435,8 @@ function App() {
 
     // --- Debugging specific to Drummer/Sweep to Unassigned ---
     console.log(`--- Drag from ${sourcePositionId} to ${overId} ---`);
+    console.log(`Is overId a known column? ${!!columns[overId]}`);
+    console.log(`Is overId a tile in Unassigned? ${!!tiles.find(tile => tile.id === overId && tile.positionId === POSITIONS.UNASSIGNED)}`);
     // --- End Debugging specific to Drummer/Sweep to Unassigned ---
 
 
@@ -410,7 +469,7 @@ function App() {
             droppedOverTileInUnassigned = overTile;
         }
     } else if (columns[overId]) {
-        // If the overId is a known column/zone ID (Drummer, Sweep, or a Bench position)
+        // If the overId is a known column/zone ID (Drummer, Sweep, or a Bench position) - Updated check
         destinationColumnId = overId;
     } else {
          // If the overId is not a column ID, check if it's a tile within the Unassigned column (fallback)
@@ -425,11 +484,6 @@ function App() {
         }
     }
 
-    // --- Debugging specific to Drummer/Sweep to Unassigned ---
-    console.log(`Determined destinationColumnId: ${destinationColumnId}`);
-    console.log(`Dropped over tile in Unassigned: ${droppedOverTileInUnassigned ? droppedOverTileInUnassigned.id : 'none'}`);
-    // --- End Debugging specific to Drummer/Sweep to Unassigned ---
-
 
     // If we couldn't determine a valid destination column (shouldn't happen if source is valid), return
     if (!destinationColumnId || !columns[sourcePositionId]) {
@@ -439,10 +493,10 @@ function App() {
     }
 
     const destinationColumn = columns[destinationColumnId]; // Get the destination column object
-    const destinationTileIds = Array.from(destinationColumn.tileIds); // Get the current tile IDs in the determined destination column
+    const destinationTileIds = Array.from(destinationColumn.tileIds); // Get the current tile IDs in the destination column
 
 
-    // ** Logic for dropping onto a single-tile zone (Drummer, Sweep, or Bench Position) **
+    // ** Logic for dropping onto a single-tile zone (Drummer, Sweep, or Bench Position) ** - Updated comment
     // These zones should only hold one tile at a time (except Unassigned)
     const isSingleTileDestination = destinationColumnId !== POSITIONS.UNASSIGNED;
 
@@ -552,11 +606,6 @@ function App() {
             return;
         }
 
-         // --- Debugging specific to Drummer/Sweep to Unassigned ---
-         console.log(`Calculated dropIndexInUnassigned: ${dropIndexInUnassigned}`);
-         console.log(`Current Unassigned tile IDs: ${currentUnassignedTileIds}`);
-         // --- End Debugging specific to Drummer/Sweep to Unassigned ---
-
 
          // Calculate the next state for columns and tiles
          const nextColumns = { ...columns };
@@ -565,7 +614,6 @@ function App() {
          // Remove dragged tile from source column (if it's not already unassigned)
          // This check is important for when a tile is moved from another column TO unassigned
          if (sourcePositionId !== POSITIONS.UNASSIGNED) {
-             console.log(`Removing ${draggedTileId} from source column ${sourcePositionId}`);
              nextColumns[sourcePositionId] = {
                  ...columns[sourcePositionId],
                  tileIds: columns[sourcePositionId].tileIds.filter(id => id !== draggedTileId),
@@ -586,12 +634,10 @@ function App() {
          let newUnassignedTileIds;
          if (sourcePositionId !== POSITIONS.UNASSIGNED) {
              // Adding a tile from another column to Unassigned
-             console.log(`Adding ${draggedTileId} to Unassigned at index ${dropIndexInUnassigned}`);
              newUnassignedTileIds = Array.from(currentUnassignedTileIds);
              newUnassignedTileIds.splice(dropIndexInUnassigned, 0, draggedTileId); // Insert at the determined index
          } else {
              // Moving within the unassigned column itself
-             console.log(`Moving ${draggedTileId} within Unassigned to index ${dropIndexInUnassigned}`);
              const oldIndex = currentUnassignedTileIds.indexOf(draggedTileId);
              if (oldIndex !== -1) {
                   newUnassignedTileIds = arrayMove(
@@ -611,15 +657,7 @@ function App() {
              tileIds: newUnassignedTileIds,
          };
 
-         // Update the positionId for the dragged tile in the nextTiles state
-         const draggedTileToUpdate = nextTiles.find(tile => tile.id === draggedTileId);
-         if (draggedTileToUpdate) {
-             draggedTileToUpdate.positionId = POSITIONS.UNASSIGNED; // Set the new position ID
-             // Update the row property for sortable lists based on the new index within Unassigned
-             draggedTileToUpdate.row = newUnassignedTileIds.indexOf(draggedTileId);
-         }
-
-         // Update rows for all tiles in the unassigned column based on the new order
+         // Update the row property for all tiles in the unassigned column based on the new order
           const tilesInUnassigned = nextTiles.filter(tile => tile.positionId === POSITIONS.UNASSIGNED)
                .sort((a, b) => nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(a.id) - nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(b.id));
 
@@ -632,58 +670,54 @@ function App() {
          // Update state with the new columns and tiles data
          setColumns(nextColumns);
          setTiles(nextTiles);
-
-         console.log("State updated for drop into Unassigned.");
-         console.log("Next Columns:", nextColumns);
-         console.log("Next Tiles:", nextTiles);
     }
   };
 
    // Handler for when a drag operation is cancelled
    const onDragCancel = () => {
     setActiveId(null); // Clear active dragged item if drag is cancelled
-  };
+   };
 
    // Handler for the "Unassign All" button click
    const handleUnassignAll = () => {
-       console.log("Unassign All button clicked.");
+        console.log("Unassign All button clicked.");
 
-       // Create copies of the current state
-       const nextColumns = { ...columns };
-       const nextTiles = [...tiles];
+        // Create copies of the current state
+        const nextColumns = { ...columns };
+        const nextTiles = [...tiles];
 
-       // Get the current tile IDs in the Unassigned column
-       const currentUnassignedTileIds = Array.from(nextColumns[POSITIONS.UNASSIGNED]?.tileIds || []);
+        // Get the current tile IDs in the Unassigned column
+        const currentUnassignedTileIds = Array.from(nextColumns[POSITIONS.UNASSIGNED]?.tileIds || []);
 
-       // Iterate through all columns (except Unassigned) and move their tiles to Unassigned
-       for (const columnId in nextColumns) {
-           if (columnId !== POSITIONS.UNASSIGNED) {
-               const column = nextColumns[columnId];
-               // Move all tile IDs from the current column to the Unassigned column
-               currentUnassignedTileIds.push(...column.tileIds);
-               // Clear the tile IDs from the current column
-               column.tileIds = [];
+        // Iterate through all columns (except Unassigned) and move their tiles to Unassigned
+        for (const columnId in nextColumns) {
+            if (columnId !== POSITIONS.UNASSIGNED) {
+                const column = nextColumns[columnId];
+                // Move all tile IDs from the current column to the Unassigned column
+                currentUnassignedTileIds.push(...column.tileIds);
+                // Clear the tile IDs from the current column
+                column.tileIds = [];
 
-               // Update the positionId for the tiles that were moved in the nextTiles state
-               // Note: This loop was incorrectly using column.tileIds after clearing it.
-               // We need to iterate through the tiles array to find and update the positionId.
-               nextTiles.forEach(tile => {
-                   if (tile.positionId === columnId) { // Check if the tile was in the column being cleared
-                       tile.positionId = POSITIONS.UNASSIGNED; // Set the new position ID
-                   }
-               });
-           }
-       }
+                // Update the positionId for the tiles that were moved in the nextTiles state
+                // Note: This loop was incorrectly using column.tileIds after clearing it.
+                // We need to iterate through the tiles array to find and update the positionId.
+                nextTiles.forEach(tile => {
+                    if (tile.positionId === columnId) { // Check if the tile was in the column being cleared
+                        tile.positionId = POSITIONS.UNASSIGNED; // Set the new position ID
+                    }
+                });
+            }
+        }
 
-        // Update the Unassigned column's tileIds with the combined list
-        nextColumns[POSITIONS.UNASSIGNED] = {
-            ...nextColumns[POSITIONS.UNASSIGNED],
-            tileIds: currentUnassignedTileIds,
-        };
+         // Update the Unassigned column's tileIds with the combined list
+         nextColumns[POSITIONS.UNASSIGNED] = {
+             ...nextColumns[POSITIONS.UNASSIGNED],
+             tileIds: currentUnassignedTileIds,
+         };
 
-        // Update the row property for all tiles in the unassigned column based on the new order
-         const tilesInUnassigned = nextTiles.filter(tile => tile.positionId === POSITIONS.UNASSIGNED)
-              .sort((a, b) => nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(a.id) - nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(b.id));
+         // Update the row property for all tiles in the unassigned column based on the new order
+          const tilesInUnassigned = nextTiles.filter(tile => tile.positionId === POSITIONS.UNASSIGNED)
+               .sort((a, b) => nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(a.id) - nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(b.id));
 
            tilesInUnassigned.forEach((tile, index) => {
                const tileToUpdate = nextTiles.find(t => t.id === tile.id);
@@ -691,28 +725,40 @@ function App() {
            });
 
 
-       // Update the state with the new columns and tiles data
-       setColumns(nextColumns);
-       setTiles(nextTiles);
+        // Update the state with the new columns and tiles data
+        setColumns(nextColumns);
+        setTiles(nextTiles);
 
-       console.log("All tiles moved to Unassigned.");
-   };
+        console.log("All tiles moved to Unassigned.");
+    };
 
-   // Handler to toggle the sidebar expanded state
-   const toggleSidebar = () => {
-       setIsSidebarExpanded(!isSidebarExpanded);
-   };
+    // Handler to toggle the sidebar expanded state
+    const toggleSidebar = () => {
+        setIsSidebarExpanded(!isSidebarExpanded);
+    };
 
-   // Handler for the Share icon click (placeholder)
-   const handleShareClick = () => {
-       console.log("Share icon clicked!");
-       // Implement your share functionality here later
-       alert("Share feature coming soon!"); // Simple alert for now
-   };
+    // Handler for the Share icon click (placeholder)
+    const handleShareClick = () => {
+        console.log("Share icon clicked!");
+        // Implement your share functionality here later
+        alert("Share feature coming soon!"); // Simple alert for now
+    };
 
 
   // Find the active tile data for the DragOverlay
   const activeTile = activeId ? getTileById(activeId) : null;
+
+  // Filter the unassigned tile IDs based on the selected filter preferences
+  const filteredUnassignedTileIds = columns[POSITIONS.UNASSIGNED]?.tileIds.filter(tileId => {
+      const tile = getTileById(tileId);
+      // If no filter preferences are selected, or "Show All" is selected, show all unassigned tiles
+      if (selectedFilterPreferences.length === 0 || selectedFilterPreferences.includes("")) {
+          return true;
+      }
+      // Otherwise, check if the tile's preference is included in the selected filter preferences
+      // Ensure tile and tile.preference exist before checking inclusion
+      return tile && tile.preference && selectedFilterPreferences.includes(tile.preference);
+  }) || [];
 
 
   return (
@@ -746,17 +792,20 @@ function App() {
           {/* Container for the Unassigned column and the main content */}
           {/* This div now holds the Unassigned column and the rest of the layout */}
           {/* Added flex-grow to ensure it takes the remaining space */}
-          <div className="flex flex-grow p-8 space-x-8"> {/* flex: enables flexbox, flex-grow: allows it to take remaining space, p-8: padding, space-x-8: horizontal space between children */}
+          {/* Reduced p-8 to p-4 and space-x-8 to space-x-4 for tighter layout */}
+          <div className="flex flex-grow p-4 space-x-4"> {/* flex: enables flexbox, flex-grow: allows it to take remaining space, p-4: padding, space-x-4: horizontal space */}
               {/* Container for the Unassigned column */}
               {/* Unassigned column uses the UnassignedColumn component */}
               <UnassignedColumn
                   key={POSITIONS.UNASSIGNED} // Unique key for React list rendering
                   id={POSITIONS.UNASSIGNED} // ID for dnd-kit droppable zone
                   title="Unassigned" // Title displayed at the top of the column
-                  tileIds={columns[POSITIONS.UNASSIGNED]?.tileIds || []} // Pass the array of tile IDs in this column (use optional chaining for safety)
+                  tileIds={filteredUnassignedTileIds} // Pass the FILTERED array of tile IDs
+                  selectedFilterPreferences={selectedFilterPreferences} // Pass the selected filter preferences
+                  onFilterChange={handleUnassignedFilterChange} // Pass the filter change handler
               >
-                  {/* Map over the tile IDs in the Unassigned column to render SortableItems */}
-                  {columns[POSITIONS.UNASSIGNED]?.tileIds.map((tileId, index) => {
+                  {/* Map over the FILTERED tile IDs in the Unassigned column to render SortableItems */}
+                  {filteredUnassignedTileIds.map((tileId, index) => {
                        const tile = getTileById(tileId); // Get the full tile data by ID
                        if (!tile) return null; // Return null if tile data is not found (shouldn't happen)
                        return (
@@ -781,7 +830,8 @@ function App() {
               {/* Added flex-grow to ensure it takes available vertical space */}
               {/* Added justify-start to align contents to the top */}
               {/* Added h-full to make this container fill the height */}
-              <div className="main-content-container flex flex-col space-y-8 flex-grow max-w-lg justify-start h-full"> {/* flex: enables flexbox, flex-col: stacks children vertically, space-y-8: vertical space between children, flex-grow: allows the container to grow, max-w-lg: sets a maximum width, justify-start: aligns contents to the top, h-full: sets height to 100% of parent */}
+              {/* Reduced space-y-8 to space-y-4 for tighter vertical spacing */}
+              <div className="main-content-container flex flex-col space-y-4 flex-grow max-w-lg justify-start h-full"> {/* flex: enables flexbox, flex-col: stacks children vertically, space-y-4: vertical space between children, flex-grow: allows the container to grow, max-w-lg: sets a maximum width, justify-start: aligns contents to the top, h-full: sets height to 100% of parent */}
                   {/* Drummer Droppable Zone */}
                   <DroppableZone
                       key={POSITIONS.DRUMMER} // Unique key
@@ -812,19 +862,23 @@ function App() {
                   {/* Main Grid Container for Left/Right Rows - uses Tailwind CSS Grid */}
                   {/* Added grid-rows-10 to explicitly define row count and ensure consistent height */}
                   {/* Added flex-grow to ensure the grid takes available vertical space */}
-                  <div className="main-grid-container grid grid-cols-2 grid-rows-10 gap-4 flex-grow"> {/* grid: enables grid layout, grid-cols-2: two equal columns, grid-rows-10: 10 rows of equal height, gap-4: space between grid items, flex-grow: allows the grid to grow */}
+                  {/* Reduced gap-4 to gap-2 for tighter grid spacing */}
+                  <div className="main-grid-container grid grid-cols-2 grid-rows-10 gap-2 flex-grow"> {/* grid: enables grid layout, grid-cols-2: two equal columns, grid-rows-10: 10 rows of equal height, gap-2: space between grid items, flex-grow: allows the grid to grow */}
                     {/* Loop through rows (1 to 10) and render Left/Right Droppable Zones */}
-                    {Array.from({ length: 10 }).map((_, rowIndex) => (
+                    {Array.from({ length: 10 }).map((_, rowIndex) => {
+                        const leftPositionId = generateBenchPositionId(rowIndex + 1, 'left');
+                        const rightPositionId = generateBenchPositionId(rowIndex + 1, 'right');
+                        return (
                         <React.Fragment key={rowIndex}> {/* Use Fragment to group the left and right zones for each row without adding extra DOM nodes */}
                             {/* Left Bench Droppable Zone - Updated ID and Label */}
                             <DroppableZone
-                                key={generateBenchPositionId(rowIndex + 1, 'left')} // Updated key
-                                id={generateBenchPositionId(rowIndex + 1, 'left')} // Updated ID
+                                key={leftPositionId} // Updated key
+                                id={leftPositionId} // Updated ID
                                 label={`Bench ${rowIndex + 1} Left`} // Updated Label
-                                occupiedTileId={columns[generateBenchPositionId(rowIndex + 1, 'left')]?.tileIds[0]} // Updated occupiedTileId check
+                                occupiedTileId={columns[leftPositionId]?.tileIds[0]} // Updated occupiedTileId check
                             >
                                 {/* Render the tile if it's in this left bench position - Updated positionId check */}
-                                {columns[generateBenchPositionId(rowIndex + 1, 'left')]?.tileIds.map(tileId => {
+                                {columns[leftPositionId]?.tileIds.map(tileId => {
                                     const tile = getTileById(tileId);
                                     if (!tile) return null;
                                     return (
@@ -835,7 +889,7 @@ function App() {
                                             // Removed content prop
                                             preference={tile.preference} // Pass preference prop
                                             paddlerName={tile.paddlerName} // Pass paddler name
-                                            currentPositionId={generateBenchPositionId(rowIndex + 1, 'left')} // Updated currentPositionId
+                                            currentPositionId={leftPositionId} // Updated currentPositionId
                                             onPaddlerNameChange={handlePaddlerNameChange}
                                             onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
                                         />
@@ -844,13 +898,13 @@ function App() {
                             </DroppableZone>
                             {/* Right Bench Droppable Zone - Updated ID and Label */}
                             <DroppableZone
-                                key={generateBenchPositionId(rowIndex + 1, 'right')} // Updated key
-                                id={generateBenchPositionId(rowIndex + 1, 'right')} // Updated ID
+                                key={rightPositionId} // Updated key
+                                id={rightPositionId} // Updated ID
                                 label={`Bench ${rowIndex + 1} Right`} // Updated Label
-                                occupiedTileId={columns[generateBenchPositionId(rowIndex + 1, 'right')]?.tileIds[0]} // Updated occupiedTileId check
+                                occupiedTileId={columns[rightPositionId]?.tileIds[0]} // Updated occupiedTileId check
                             >
                                 {/* Render the tile if it's in this right bench position - Updated positionId check */}
-                                {columns[generateBenchPositionId(rowIndex + 1, 'right')]?.tileIds.map(tileId => {
+                                {columns[rightPositionId]?.tileIds.map(tileId => {
                                     const tile = getTileById(tileId);
                                     if (!tile) return null;
                                     return (
@@ -861,7 +915,7 @@ function App() {
                                             // Removed content prop
                                             preference={tile.preference} // Pass preference prop
                                             paddlerName={tile.paddlerName} // Pass paddler name
-                                            currentPositionId={generateBenchPositionId(rowIndex + 1, 'right')} // Updated currentPositionId
+                                            currentPositionId={rightPositionId} // Updated currentPositionId
                                             onPaddlerNameChange={handlePaddlerNameChange}
                                             onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
                                         />
@@ -869,7 +923,8 @@ function App() {
                                 })}
                             </DroppableZone>
                         </React.Fragment>
-                    ))}
+                    );
+                    })}
                   </div>
 
                   {/* Sweep Droppable Zone */}
@@ -909,30 +964,41 @@ function App() {
         {/* Conditional rendering: only render if there is an active dragged item and its data is found */}
         {activeId && activeTile ? (
           <div
-            className="p-4 rounded-md shadow-md bg-white text-gray-800 select-none cursor-grabbing w-[200px] border border-black" // Tailwind classes for overlay styling (padding, rounded corners, shadow, background, text color, no text selection, grabbing cursor, fixed width, solid black border)
+            // Apply similar conditional styling for the overlay based on the tile's *original* position
+            // Adjusted width and font size based on original position
+            className={`p-1 rounded-md shadow-md bg-white text-gray-800 select-none cursor-grabbing border border-black ${activeTile.positionId === POSITIONS.UNASSIGNED ? 'w-[120px] text-xs' : 'w-[200px] text-sm'}`}
           >
             {/* Display position based on the tile's position *before* the drag started */}
-             <div className="font-semibold mb-2 text-gray-700">
-                 {activeTile.positionId === POSITIONS.DRUMMER ? 'Drummer'
-                  : activeTile.positionId === POSITIONS.SWEEP ? 'Sweep'
-                  : activeTile.positionId === POSITIONS.UNASSIGNED ? `Unassigned Index: ${columns[POSITIONS.UNASSIGNED]?.tileIds.indexOf(activeTile.id)}` // Display current index in unassigned
-                  : activeTile.positionId.startsWith(POSITIONS.BENCH) ? `Bench ${activeTile.positionId.split('-')[1]} - ${activeTile.positionId.split('-')[2].charAt(0).toUpperCase() + activeTile.positionId.split('-')[2].slice(1)}` // Updated display for Bench
-                  : activeTile.positionId} {/* Fallback display if position ID is not recognized */}
+             {activeTile.positionId !== POSITIONS.UNASSIGNED && (
+                 <div className="font-semibold mb-1 text-gray-700 text-xs"> {/* Smaller font for header */}
+                     {activeTile.positionId === POSITIONS.DRUMMER ? 'Drummer'
+                      : activeTile.positionId === POSITIONS.SWEEP ? 'Sweep'
+                      : activeTile.positionId.startsWith(POSITIONS.BENCH) ? `Bench ${activeTile.positionId.split('-')[1]} - ${activeTile.positionId.split('-')[2].charAt(0).toUpperCase() + activeTile.positionId.split('-')[2].slice(1)}` // Updated display for Bench
+                      : activeTile.positionId} {/* Fallback display if position ID is not recognized */}
+                 </div>
+             )}
+
+             {/* Paddler Name in Overlay (read-only) - Using flexbox for label and input on same line */}
+             {/* Adjusted spacing and width handling for overlay */}
+             <div className="mt-0.5 mb-0.5 flex items-center"> {/* Added flex and items-center */}
+                <div className="text-xs text-gray-600 mr-1 shrink-0">Name:</div> {/* Added mr-1 for spacing, shrink-0 */}
+                <div className="text-xs text-gray-800 w-auto min-w-0">{activeTile.paddlerName}</div> {/* Display the paddler name, added w-auto min-w-0 */}
              </div>
-             {/* Paddler Name in Overlay (read-only) - Moved to the top */}
-             <div className="mt-1 mb-2"> {/* Container for the input, added margin-bottom */}
-                <div className="text-xs text-gray-600 mb-1">Name:</div> {/* Label changed to "Name:" */}
-                <div>{activeTile.paddlerName}</div> {/* Display the paddler name */}
+             {/* Preference in Overlay (read-only) - Using flexbox for label and input on same line */}
+             {/* Adjusted spacing and width handling for overlay */}
+             <div className="mt-0.5 mb-0.5 flex items-center"> {/* Added flex and items-center */}
+                <div className="text-xs text-gray-600 mr-1 shrink-0">Preference:</div> {/* Label for the preference field, added mr-1, shrink-0 */}
+                {/* Display the preference value from the tile data */}
+                <div className="text-xs text-gray-800 w-auto min-w-0">{activeTile.preference}</div> {/* Display the preference, added w-auto min-w-0 */}
              </div>
-             {/* Preference in Overlay (read-only) */}
-             <div className="mt-1 mb-2"> {/* Container for the input, added margin-bottom */}
-                <div className="text-xs text-gray-600 mb-1">Preference:</div> {/* Label for the preference field */}
-                <div>{activeTile.preference}</div> {/* Display the preference */}
-             </div>
-            {/* Removed the div displaying the original tile content in the overlay */}
-            {/* <div className="text-gray-800">{content}</div> */}
-            {/* Removed the div displaying the original tile note in the overlay */}
-            {/* <div className="text-gray-600 text-sm">{note}</div> */}
+
+             {/* Hide original content and note for unassigned tiles in overlay */}
+             {activeTile.positionId !== POSITIONS.UNASSIGNED && (
+                 <>
+                     <div className="text-gray-800 text-xs">{/*activeTile.content*/}</div> {/* Smaller content font */}
+                     <div className="text-gray-600 text-[8pt]">{/*activeTile.note*/}</div> {/* Even smaller note font */}
+                 </>
+             )}
 
           </div>
         ) : null} {/* Render nothing if no item is being dragged */}
