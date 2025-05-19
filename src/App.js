@@ -667,9 +667,9 @@ function App() {
            });
 
 
-         // Update state with the new columns and tiles data
-         setColumns(nextColumns);
-         setTiles(nextTiles);
+       // Update state with the new columns and tiles data
+       setColumns(nextColumns);
+       setTiles(nextTiles);
     }
   };
 
@@ -825,135 +825,142 @@ function App() {
                    })}
               </UnassignedColumn>
 
-              {/* Container for the drummer, main grid, and sweep - uses Tailwind flexbox for vertical stacking */}
-              {/* Added max-w-lg to make this section narrower */}
-              {/* Added flex-grow to ensure it takes available vertical space */}
-              {/* Added justify-start to align contents to the top */}
-              {/* Added h-full to make this container fill the height */}
-              {/* Reduced space-y-8 to space-y-4 for tighter vertical spacing */}
-              <div className="main-content-container flex flex-col space-y-4 flex-grow max-w-lg justify-start h-full"> {/* flex: enables flexbox, flex-col: stacks children vertically, space-y-4: vertical space between children, flex-grow: allows the container to grow, max-w-lg: sets a maximum width, justify-start: aligns contents to the top, h-full: sets height to 100% of parent */}
-                  {/* Drummer Droppable Zone */}
-                  <DroppableZone
-                      key={POSITIONS.DRUMMER} // Unique key
-                      id={POSITIONS.DRUMMER} // ID for dnd-kit droppable zone
-                      label="Drummer" // Label displayed when empty
-                      occupiedTileId={columns[POSITIONS.DRUMMER]?.tileIds[0]} // Pass the ID of the tile currently in this single-tile zone
-                  >
-                       {/* Render the tile if it's in the Drummer position */}
-                       {columns[POSITIONS.DRUMMER]?.tileIds.map(tileId => {
-                           const tile = getTileById(tileId);
-                           if (!tile) return null;
-                           return (
-                               // Render a SortableItem for the Drummer tile
-                               <SortableItem
-                                   key={tileId}
-                                   id={tileId}
-                                   // Removed content prop
-                                   preference={tile.preference} // Pass preference prop
-                                   paddlerName={tile.paddlerName} // Pass paddler name
-                                   currentPositionId={POSITIONS.DRUMMER} // Pass the current position ID
-                                   onPaddlerNameChange={handlePaddlerNameChange}
-                                   onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
-                               />
-                           );
-                       })}
-                  </DroppableZone>
+              {/* New container to group Boat 1 elements */}
+              {/* Added border and padding for visual grouping */}
+              <div className="boat-container border border-gray-300 rounded-md p-4 flex flex-col space-y-4 flex-grow max-w-lg"> {/* Added border, rounded corners, padding, and flex-col for vertical stacking */}
+                  {/* Label for Boat 1 */}
+                  <h3 className="text-lg font-semibold text-gray-800 text-center mb-2">Boat 1</h3> {/* Added text-center and mb-2 */}
 
-                  {/* Main Grid Container for Left/Right Rows - uses Tailwind CSS Grid */}
-                  {/* Added grid-rows-10 to explicitly define row count and ensure consistent height */}
-                  {/* Added flex-grow to ensure the grid takes available vertical space */}
-                  {/* Reduced gap-4 to gap-2 for tighter grid spacing */}
-                  <div className="main-grid-container grid grid-cols-2 grid-rows-10 gap-2 flex-grow"> {/* grid: enables grid layout, grid-cols-2: two equal columns, grid-rows-10: 10 rows of equal height, gap-2: space between grid items, flex-grow: allows the grid to grow */}
-                    {/* Loop through rows (1 to 10) and render Left/Right Droppable Zones */}
-                    {Array.from({ length: 10 }).map((_, rowIndex) => {
-                        const leftPositionId = generateBenchPositionId(rowIndex + 1, 'left');
-                        const rightPositionId = generateBenchPositionId(rowIndex + 1, 'right');
-                        return (
-                        <React.Fragment key={rowIndex}> {/* Use Fragment to group the left and right zones for each row without adding extra DOM nodes */}
-                            {/* Left Bench Droppable Zone - Updated ID and Label */}
-                            <DroppableZone
-                                key={leftPositionId} // Updated key
-                                id={leftPositionId} // Updated ID
-                                label={`Bench ${rowIndex + 1} Left`} // Updated Label
-                                occupiedTileId={columns[leftPositionId]?.tileIds[0]} // Updated occupiedTileId check
-                            >
-                                {/* Render the tile if it's in this left bench position - Updated positionId check */}
-                                {columns[leftPositionId]?.tileIds.map(tileId => {
-                                    const tile = getTileById(tileId);
-                                    if (!tile) return null;
-                                    return (
-                                        // Render a SortableItem for the tile in this zone - Updated currentPositionId
-                                        <SortableItem
-                                            key={tileId}
-                                            id={tileId}
-                                            // Removed content prop
-                                            preference={tile.preference} // Pass preference prop
-                                            paddlerName={tile.paddlerName} // Pass paddler name
-                                            currentPositionId={leftPositionId} // Updated currentPositionId
-                                            onPaddlerNameChange={handlePaddlerNameChange}
-                                            onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
-                                        />
-                                    );
-                                })}
-                            </DroppableZone>
-                            {/* Right Bench Droppable Zone - Updated ID and Label */}
-                            <DroppableZone
-                                key={rightPositionId} // Updated key
-                                id={rightPositionId} // Updated ID
-                                label={`Bench ${rowIndex + 1} Right`} // Updated Label
-                                occupiedTileId={columns[rightPositionId]?.tileIds[0]} // Updated occupiedTileId check
-                            >
-                                {/* Render the tile if it's in this right bench position - Updated positionId check */}
-                                {columns[rightPositionId]?.tileIds.map(tileId => {
-                                    const tile = getTileById(tileId);
-                                    if (!tile) return null;
-                                    return (
-                                        // Render a SortableItem for the tile in this zone - Updated currentPositionId
-                                        <SortableItem
-                                            key={tileId}
-                                            id={tileId}
-                                            // Removed content prop
-                                            preference={tile.preference} // Pass preference prop
-                                            paddlerName={tile.paddlerName} // Pass paddler name
-                                            currentPositionId={rightPositionId} // Updated currentPositionId
-                                            onPaddlerNameChange={handlePaddlerNameChange}
-                                            onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
-                                        />
-                                    );
-                                })}
-                            </DroppableZone>
-                        </React.Fragment>
-                    );
-                    })}
+                  {/* Container for the drummer, main grid, and sweep - uses Tailwind flexbox for vertical stacking */}
+                  {/* Added max-w-lg to make this section narrower */}
+                  {/* Added flex-grow to ensure it takes available vertical space */}
+                  {/* Added justify-start to align contents to the top */}
+                  {/* Added h-full to make this container fill the height */}
+                  {/* Reduced space-y-8 to space-y-4 for tighter vertical spacing */}
+                  <div className="main-content-container flex flex-col space-y-4 flex-grow justify-start h-full"> {/* flex: enables flexbox, flex-col: stacks children vertically, space-y-4: vertical space between children, flex-grow: allows the container to grow, justify-start: aligns contents to the top, h-full: sets height to 100% of parent */}
+                      {/* Drummer Droppable Zone */}
+                      <DroppableZone
+                          key={POSITIONS.DRUMMER} // Unique key
+                          id={POSITIONS.DRUMMER} // ID for dnd-kit droppable zone
+                          label="Drummer" // Label displayed when empty
+                          occupiedTileId={columns[POSITIONS.DRUMMER]?.tileIds[0]} // Pass the ID of the tile currently in this single-tile zone
+                      >
+                           {/* Render the tile if it's in the Drummer position */}
+                           {columns[POSITIONS.DRUMMER]?.tileIds.map(tileId => {
+                               const tile = getTileById(tileId);
+                               if (!tile) return null;
+                               return (
+                                   // Render a SortableItem for the Drummer tile
+                                   <SortableItem
+                                       key={tileId}
+                                       id={tileId}
+                                       // Removed content prop
+                                       preference={tile.preference} // Pass preference prop
+                                       paddlerName={tile.paddlerName} // Pass paddler name
+                                       currentPositionId={POSITIONS.DRUMMER} // Pass the current position ID
+                                       onPaddlerNameChange={handlePaddlerNameChange}
+                                       onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
+                                   />
+                               );
+                           })}
+                      </DroppableZone>
+
+                      {/* Main Grid Container for Left/Right Rows - uses Tailwind CSS Grid */}
+                      {/* Added grid-rows-10 to explicitly define row count and ensure consistent height */}
+                      {/* Added flex-grow to ensure the grid takes available vertical space */}
+                      {/* Reduced gap-4 to gap-2 for tighter grid spacing */}
+                      <div className="main-grid-container grid grid-cols-2 grid-rows-10 gap-2 flex-grow"> {/* grid: enables grid layout, grid-cols-2: two equal columns, grid-rows-10: 10 rows of equal height, gap-2: space between grid items, flex-grow: allows the grid to grow */}
+                        {/* Loop through rows (1 to 10) and render Left/Right Droppable Zones */}
+                        {Array.from({ length: 10 }).map((_, rowIndex) => {
+                            const leftPositionId = generateBenchPositionId(rowIndex + 1, 'left');
+                            const rightPositionId = generateBenchPositionId(rowIndex + 1, 'right');
+                            return (
+                            <React.Fragment key={rowIndex}> {/* Use Fragment to group the left and right zones for each row without adding extra DOM nodes */}
+                                {/* Left Bench Droppable Zone - Updated ID and Label */}
+                                <DroppableZone
+                                    key={leftPositionId} // Updated key
+                                    id={leftPositionId} // Updated ID
+                                    label={`Bench ${rowIndex + 1} Left`} // Updated Label
+                                    occupiedTileId={columns[leftPositionId]?.tileIds[0]} // Updated occupiedTileId check
+                                >
+                                    {/* Render the tile if it's in this left bench position - Updated positionId check */}
+                                    {columns[leftPositionId]?.tileIds.map(tileId => {
+                                        const tile = getTileById(tileId);
+                                        if (!tile) return null;
+                                        return (
+                                            // Render a SortableItem for the tile in this zone - Updated currentPositionId
+                                            <SortableItem
+                                                key={tileId}
+                                                id={tileId}
+                                                // Removed content prop
+                                                preference={tile.preference} // Pass preference prop
+                                                paddlerName={tile.paddlerName} // Pass paddler name
+                                                currentPositionId={leftPositionId} // Updated currentPositionId
+                                                onPaddlerNameChange={handlePaddlerNameChange}
+                                                onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
+                                            />
+                                        );
+                                    })}
+                                </DroppableZone>
+                                {/* Right Bench Droppable Zone - Updated ID and Label */}
+                                <DroppableZone
+                                    key={rightPositionId} // Updated key
+                                    id={rightPositionId} // Updated ID
+                                    label={`Bench ${rowIndex + 1} Right`} // Updated Label
+                                    occupiedTileId={columns[rightPositionId]?.tileIds[0]} // Updated occupiedTileId check
+                                >
+                                    {/* Render the tile if it's in this right bench position - Updated positionId check */}
+                                    {columns[rightPositionId]?.tileIds.map(tileId => {
+                                        const tile = getTileById(tileId);
+                                        if (!tile) return null;
+                                        return (
+                                            // Render a SortableItem for the tile in this zone - Updated currentPositionId
+                                            <SortableItem
+                                                key={tileId}
+                                                id={tileId}
+                                                // Removed content prop
+                                                preference={tile.preference} // Pass preference prop
+                                                paddlerName={tile.paddlerName} // Pass paddler name
+                                                currentPositionId={rightPositionId} // Updated currentPositionId
+                                                onPaddlerNameChange={handlePaddlerNameChange}
+                                                onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
+                                            />
+                                        );
+                                    })}
+                                </DroppableZone>
+                            </React.Fragment>
+                        );
+                        })}
+                      </div>
+
+                      {/* Sweep Droppable Zone */}
+                      <DroppableZone
+                          key={POSITIONS.SWEEP} // Unique key
+                          id={POSITIONS.SWEEP} // ID for dnd-kit droppable zone
+                          label="Sweep" // Label
+                          occupiedTileId={columns[POSITIONS.SWEEP]?.tileIds[0]} // Pass the ID of the tile currently in this single-tile zone
+                      >
+                           {/* Render the tile if it's in the Sweep position */}
+                           {columns[POSITIONS.SWEEP]?.tileIds.map(tileId => {
+                               const tile = getTileById(tileId);
+                               if (!tile) return null;
+                               return (
+                                   // Render a SortableItem for the Sweep tile
+                                   <SortableItem
+                                       key={tileId}
+                                       id={tileId}
+                                       // Removed content prop
+                                       preference={tile.preference} // Pass preference prop
+                                       paddlerName={tile.paddlerName} // Pass paddler name
+                                       currentPositionId={POSITIONS.SWEEP} // Pass the current position ID
+                                       onPaddlerNameChange={handlePaddlerNameChange}
+                                       onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
+                                   />
+                               );
+                           })}
+                      </DroppableZone>
                   </div>
-
-                  {/* Sweep Droppable Zone */}
-                  <DroppableZone
-                      key={POSITIONS.SWEEP} // Unique key
-                      id={POSITIONS.SWEEP} // ID for dnd-kit droppable zone
-                      label="Sweep" // Label
-                      occupiedTileId={columns[POSITIONS.SWEEP]?.tileIds[0]} // Pass the ID of the tile currently in this single-tile zone
-                  >
-                       {/* Render the tile if it's in the Sweep position */}
-                       {columns[POSITIONS.SWEEP]?.tileIds.map(tileId => {
-                           const tile = getTileById(tileId);
-                           if (!tile) return null;
-                           return (
-                               // Render a SortableItem for the Sweep tile
-                               <SortableItem
-                                   key={tileId}
-                                   id={tileId}
-                                   // Removed content prop
-                                   preference={tile.preference} // Pass preference prop
-                                   paddlerName={tile.paddlerName} // Pass paddler name
-                                   currentPositionId={POSITIONS.SWEEP} // Pass the current position ID
-                                   onPaddlerNameChange={handlePaddlerNameChange}
-                                   onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
-                               />
-                           );
-                       })}
-                  </DroppableZone>
-              </div>
+              </div> {/* End Boat 1 container */}
           </div>
       </div>
 
