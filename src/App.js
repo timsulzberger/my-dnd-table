@@ -9,7 +9,7 @@ import {
   KeyboardSensor, // Sensor that responds to keyboard events
   // Import collision detection strategies
   closestCenter, // Collision detection algorithm: finds the closest droppable center
-  rectIntersection, // Collision detection algorithm: detects overlapping rectangles
+  rectIntersection, // Collision detection algorithm: detects overlapping rectangles - Re-imported for custom strategy
   useDroppable, // Hook to make an element a droppable zone
 } from '@dnd-kit/core';
 // Import necessary hooks and utilities from @dnd-kit/sortable
@@ -24,6 +24,9 @@ import { CSS } from '@dnd-kit/utilities';
 
 // Import the new Sidebar component
 import Sidebar from './Sidebar';
+// Import the AppBar component
+import AppBar from './AppBar';
+
 
 // Remove the old CSS import - styling is now handled by Tailwind classes
 // import './App.css';
@@ -246,17 +249,20 @@ function UnassignedColumn({ children, id, title, tileIds }) {
     );
 }
 
-// Custom collision detection strategy that combines rectIntersection and closestCenter
+// Custom collision detection strategy
 const customCollisionDetection = (args) => {
-    // First, use rectIntersection for precise detection over droppable areas
-    const rectCollisions = rectIntersection(args);
+    // Prioritize rectIntersection for the Unassigned column
+    const unassignedCollision = rectIntersection(args, {
+        // Specify the droppable ID for the Unassigned column
+        droppableContainer: args.droppableContainers.find(container => container.id === POSITIONS.UNASSIGNED),
+    });
 
-    // If rectIntersection finds collisions, return them
-    if (rectCollisions.length > 0) {
-        return rectCollisions;
+    // If there's a collision with the Unassigned column, return it
+    if (unassignedCollision.length > 0) {
+        return unassignedCollision;
     }
 
-    // If no rectIntersection collisions, fall back to closestCenter
+    // Otherwise, fall back to closestCenter for all other droppable areas
     return closestCenter(args);
 };
 
@@ -269,6 +275,10 @@ function App() {
   const [columns, setColumns] = useState({});
   // State to manage the expanded/collapsed state of the sidebar
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false); // Initially collapsed
+  // State to hold the current section name for the AppBar
+  // eslint-disable-next-line no-unused-vars
+  const [currentSection, setCurrentSection] = useState('Boat Layout'); // Default section name - setCurrentSection is currently unused, but kept for future navigation features
+
 
   // Effect hook to populate the columns state based on the initialTiles data
   // Runs only once on component mount (empty dependency array [])
@@ -348,6 +358,10 @@ function App() {
 
     setActiveId(null); // Clear the activeId as the drag has ended
 
+    // Log the active and over objects for debugging purposes
+    console.log("Drag ended. Active:", active);
+    console.log("Drag ended. Over:", over);
+
     // Dropped outside a droppable area or over the same item
     if (!over || active.id === over.id) {
       console.log(!over ? "Dropped outside any droppable area." : "Dropped onto the same item.");
@@ -357,6 +371,14 @@ function App() {
     const draggedTileId = active.id; // Get the ID of the dragged tile
     const sourcePositionId = active.data.current?.currentPositionId; // Get the original position ID from the active item's data
     const overId = over.id; // Get the ID of the element being dragged over
+
+    console.log("Dragged Tile ID:", draggedTileId);
+    console.log("Source Position ID:", sourcePositionId);
+    console.log("Over ID:", overId); // Log the overId for debugging
+
+    // --- Debugging specific to Drummer/Sweep to Unassigned ---
+    console.log(`--- Drag from ${sourcePositionId} to ${overId} ---`);
+    // --- End Debugging specific to Drummer/Sweep to Unassigned ---
 
 
     // Find the tile that was dragged
@@ -376,24 +398,40 @@ function App() {
     let destinationColumnId = null;
     let droppedOverTileInUnassigned = null; // To store the tile being dropped over in unassigned
 
-    // ** Revised logic for determining destinationColumnId with combined collision detection **
-    // Prioritize checking if the overId is the Unassigned column itself or a known column/zone ID
-    if (overId === POSITIONS.UNASSIGNED) {
+    // ** Prioritized handling for dragging from a single-tile zone to Unassigned **
+    // If the drag started from a single-tile zone (not Unassigned)
+    // AND the overId is the Unassigned column ID OR the overId is a tile within the Unassigned column,
+    // we explicitly set the destination to Unassigned and handle sorting within Unassigned.
+    if (sourcePositionId !== POSITIONS.UNASSIGNED && (overId === POSITIONS.UNASSIGNED || isOverTileInUnassigned)) {
+        console.log(`Detected drop into Unassigned from single-tile zone (${sourcePositionId}). Setting destination to Unassigned.`);
         destinationColumnId = POSITIONS.UNASSIGNED;
+        // If dropped over a tile in Unassigned, store that tile
+        if (isOverTileInUnassigned) {
+            droppedOverTileInUnassigned = overTile;
+        }
     } else if (columns[overId]) {
+        // If the overId is a known column/zone ID (Drummer, Sweep, or a Bench position)
         destinationColumnId = overId;
-    } else if (isOverTileInUnassigned) {
-         // If dropped over a tile that is *already* in the Unassigned column (fallback)
-        destinationColumnId = POSITIONS.UNASSIGNED;
-        droppedOverTileInUnassigned = overTile; // Store the tile being dropped over
     } else {
-         // If the overId is a tile but not in the Unassigned column, it's an invalid drop target
-         console.error(`Invalid drop target: overId is a tile (${overId}) not in Unassigned.`);
-         return; // Exit if the drop is invalid
+         // If the overId is not a column ID, check if it's a tile within the Unassigned column (fallback)
+        const tileInUnassigned = tiles.find(tile => tile.id === overId && tile.positionId === POSITIONS.UNASSIGNED);
+        if (tileInUnassigned) {
+            destinationColumnId = POSITIONS.UNASSIGNED;
+            droppedOverTileInUnassigned = tileInUnassigned;
+        } else {
+             // If the overId is a tile but not in the Unassigned column, it's an invalid drop target
+             console.error(`Invalid drop target: overId is a tile (${overId}) not in Unassigned.`);
+             return; // Exit if the drop is invalid
+        }
     }
 
+    // --- Debugging specific to Drummer/Sweep to Unassigned ---
+    console.log(`Determined destinationColumnId: ${destinationColumnId}`);
+    console.log(`Dropped over tile in Unassigned: ${droppedOverTileInUnassigned ? droppedOverTileInUnassigned.id : 'none'}`);
+    // --- End Debugging specific to Drummer/Sweep to Unassigned ---
 
-    // If we couldn't determine a valid destination column after the special handling, return
+
+    // If we couldn't determine a valid destination column (shouldn't happen if source is valid), return
     if (!destinationColumnId || !columns[sourcePositionId]) {
          console.error("Invalid drag operation: Could not determine valid source or final destination position.");
          console.log("Columns state:", columns);
@@ -401,7 +439,7 @@ function App() {
     }
 
     const destinationColumn = columns[destinationColumnId]; // Get the destination column object
-    const destinationTileIds = Array.from(destinationColumn.tileIds); // Get the current tile IDs in the destination column
+    const destinationTileIds = Array.from(destinationColumn.tileIds); // Get the current tile IDs in the determined destination column
 
 
     // ** Logic for dropping onto a single-tile zone (Drummer, Sweep, or Bench Position) **
@@ -488,6 +526,7 @@ function App() {
 
     } else {
         // ** Logic for dropping into the Unassigned column (which is a sortable list) **
+        // This block handles drags that started from the Unassigned column OR were redirected to Unassigned
         console.log("Dropped into Unassigned column.");
 
         // Get the current tile IDs for the unassigned column
@@ -496,22 +535,27 @@ function App() {
         // Determine the drop index within the unassigned list
         let dropIndexInUnassigned = currentUnassignedTileIds.length; // Default to end if dropped on container
 
-        // If dropped over a specific tile within the unassigned list, determine the index
         if (droppedOverTileInUnassigned) {
+             // Dropped over a specific tile within the unassigned list
              dropIndexInUnassigned = currentUnassignedTileIds.indexOf(droppedOverTileInUnassigned.id);
              // Adjust index if moving within unassigned and dropping below original position
              if (sourcePositionId === POSITIONS.UNASSIGNED && currentUnassignedTileIds.indexOf(draggedTileId) !== -1 && dropIndexInUnassigned > currentUnassignedTileIds.indexOf(draggedTileId)) {
                  dropIndexInUnassigned--;
              }
         } else if (overId === POSITIONS.UNASSIGNED) { // Explicitly check if dropped on the Unassigned container
-             // Dropped directly onto the Unassigned column container, add to the end
-             dropIndexInUnassigned = currentUnassignedTileIds.length;
+             // Dropped directly onto the Unassigned column container
+             dropIndexInUnassigned = currentUnassignedTileIds.length; // Add to the end
         } else {
             // This case should ideally not be reached with the updated logic,
             // but as a fallback, log an error and return.
             console.error("Could not determine valid drop index in Unassigned column.");
             return;
         }
+
+         // --- Debugging specific to Drummer/Sweep to Unassigned ---
+         console.log(`Calculated dropIndexInUnassigned: ${dropIndexInUnassigned}`);
+         console.log(`Current Unassigned tile IDs: ${currentUnassignedTileIds}`);
+         // --- End Debugging specific to Drummer/Sweep to Unassigned ---
 
 
          // Calculate the next state for columns and tiles
@@ -521,6 +565,7 @@ function App() {
          // Remove dragged tile from source column (if it's not already unassigned)
          // This check is important for when a tile is moved from another column TO unassigned
          if (sourcePositionId !== POSITIONS.UNASSIGNED) {
+             console.log(`Removing ${draggedTileId} from source column ${sourcePositionId}`);
              nextColumns[sourcePositionId] = {
                  ...columns[sourcePositionId],
                  tileIds: columns[sourcePositionId].tileIds.filter(id => id !== draggedTileId),
@@ -541,10 +586,12 @@ function App() {
          let newUnassignedTileIds;
          if (sourcePositionId !== POSITIONS.UNASSIGNED) {
              // Adding a tile from another column to Unassigned
+             console.log(`Adding ${draggedTileId} to Unassigned at index ${dropIndexInUnassigned}`);
              newUnassignedTileIds = Array.from(currentUnassignedTileIds);
              newUnassignedTileIds.splice(dropIndexInUnassigned, 0, draggedTileId); // Insert at the determined index
          } else {
              // Moving within the unassigned column itself
+             console.log(`Moving ${draggedTileId} within Unassigned to index ${dropIndexInUnassigned}`);
              const oldIndex = currentUnassignedTileIds.indexOf(draggedTileId);
              if (oldIndex !== -1) {
                   newUnassignedTileIds = arrayMove(
@@ -585,13 +632,17 @@ function App() {
          // Update state with the new columns and tiles data
          setColumns(nextColumns);
          setTiles(nextTiles);
+
+         console.log("State updated for drop into Unassigned.");
+         console.log("Next Columns:", nextColumns);
+         console.log("Next Tiles:", nextTiles);
     }
   };
 
    // Handler for when a drag operation is cancelled
    const onDragCancel = () => {
     setActiveId(null); // Clear active dragged item if drag is cancelled
-   };
+  };
 
    // Handler for the "Unassign All" button click
    const handleUnassignAll = () => {
@@ -632,7 +683,7 @@ function App() {
 
         // Update the row property for all tiles in the unassigned column based on the new order
          const tilesInUnassigned = nextTiles.filter(tile => tile.positionId === POSITIONS.UNASSIGNED)
-               .sort((a, b) => nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(a.id) - nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(b.id));
+              .sort((a, b) => nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(a.id) - nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(b.id));
 
            tilesInUnassigned.forEach((tile, index) => {
                const tileToUpdate = nextTiles.find(t => t.id === tile.id);
@@ -640,7 +691,7 @@ function App() {
            });
 
 
-       // Update state with the new columns and tiles data
+       // Update the state with the new columns and tiles data
        setColumns(nextColumns);
        setTiles(nextTiles);
 
@@ -652,31 +703,40 @@ function App() {
        setIsSidebarExpanded(!isSidebarExpanded);
    };
 
+   // Handler for the Share icon click (placeholder)
+   const handleShareClick = () => {
+       console.log("Share icon clicked!");
+       // Implement your share functionality here later
+       alert("Share feature coming soon!"); // Simple alert for now
+   };
+
 
   // Find the active tile data for the DragOverlay
   const activeTile = activeId ? getTileById(activeId) : null;
-
-  // Determine the left margin for the main content based on sidebar state
-  // w-16 (64px) when collapsed, w-64 (256px) when expanded
-  const mainContentMarginLeft = isSidebarExpanded ? 'ml-64' : 'ml-16';
 
 
   return (
     // DndContext provides the drag and drop context to the application
     <DndContext
       sensors={sensors} // Pass the configured sensors
-      // Use the custom collision detection strategy
-      collisionDetection={customCollisionDetection}
+      collisionDetection={customCollisionDetection} // Use the custom collision detection strategy
       onDragStart={onDragStart} // Call onDragStart when a drag begins
       onDragEnd={onDragEnd} // Call onDragEnd when a drag ends
       onDragCancel={onDragCancel} // Call onDragCancel when a drag is cancelled
     >
-      {/* Main layout container using Tailwind flexbox for side-by-side layout */}
-      {/* Added a parent flex container to hold the sidebar and the main content */}
-      {/* Added items-start to align items to the top */}
-      <div className="flex min-h-screen items-start"> {/* flex: enables flexbox, min-h-screen: minimum height of the viewport, items-start: aligns items to the top */}
+      {/* AppBar component - Fixed at the top */}
+      <AppBar
+        appName="Dragon Boat Roster" // Replace with your app name
+        sectionName={currentSection} // Pass the current section name state
+        onShareClick={handleShareClick} // Pass the share click handler
+      />
 
-          {/* Render the Sidebar component, passing necessary props */}
+      {/* Main content area below the AppBar */}
+      {/* flex min-h-screen: Ensures this area takes at least the full viewport height below the AppBar */}
+      {/* mt-16: Adds top margin to push content down, matching AppBar height */}
+      <div className="flex min-h-screen mt-16"> {/* flex: enables flexbox, min-h-screen: minimum height, mt-16: margin top */}
+          {/* Sidebar component - Positioning is now relative to this flex container */}
+          {/* Pass necessary props to the Sidebar */}
           <Sidebar
               isExpanded={isSidebarExpanded} // Pass the expanded state
               toggleSidebar={toggleSidebar} // Pass the toggle function
@@ -686,9 +746,7 @@ function App() {
           {/* Container for the Unassigned column and the main content */}
           {/* This div now holds the Unassigned column and the rest of the layout */}
           {/* Added flex-grow to ensure it takes the remaining space */}
-          {/* Added conditional left margin based on sidebar state */}
-          {/* Added pl-4 for left padding */}
-          <div className={`flex flex-grow p-8 space-x-8 ${mainContentMarginLeft} pl-4`}> {/* flex: enables flexbox, flex-grow: allows it to take remaining space, p-8: padding, space-x-8: horizontal space between children, conditional left margin, pl-4: left padding */}
+          <div className="flex flex-grow p-8 space-x-8"> {/* flex: enables flexbox, flex-grow: allows it to take remaining space, p-8: padding, space-x-8: horizontal space between children */}
               {/* Container for the Unassigned column */}
               {/* Unassigned column uses the UnassignedColumn component */}
               <UnassignedColumn
@@ -721,7 +779,9 @@ function App() {
               {/* Container for the drummer, main grid, and sweep - uses Tailwind flexbox for vertical stacking */}
               {/* Added max-w-lg to make this section narrower */}
               {/* Added flex-grow to ensure it takes available vertical space */}
-              <div className="main-content-container flex flex-col space-y-8 flex-grow max-w-lg"> {/* flex: enables flexbox, flex-col: stacks children vertically, space-y-8: vertical space between children, flex-grow: allows the container to grow, max-w-lg: sets a maximum width */}
+              {/* Added justify-start to align contents to the top */}
+              {/* Added h-full to make this container fill the height */}
+              <div className="main-content-container flex flex-col space-y-8 flex-grow max-w-lg justify-start h-full"> {/* flex: enables flexbox, flex-col: stacks children vertically, space-y-8: vertical space between children, flex-grow: allows the container to grow, max-w-lg: sets a maximum width, justify-start: aligns contents to the top, h-full: sets height to 100% of parent */}
                   {/* Drummer Droppable Zone */}
                   <DroppableZone
                       key={POSITIONS.DRUMMER} // Unique key
@@ -881,5 +941,4 @@ function App() {
   );
 }
 
-// Ensure this export statement is the very last line in the file.
 export default App;
