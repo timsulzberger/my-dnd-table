@@ -97,9 +97,10 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
   });
 
   // Tailwind classes for styling the tile
-  // baseClasses: Common styles for all tiles (padding, rounded corners, cursor, flex layout, transition, solid black border)
+  // baseClasses: Common styles for all tiles (padding, rounded corners, cursor, flex layout, transition, solid black border, touch-action-none)
   // Reduced padding for tighter tiles
-  const baseClasses = `p-1 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-black`;
+  // Added touch-action-none to prevent default browser touch behaviors (scrolling, zooming) during drag
+  const baseClasses = `p-1 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-black touch-action-none`;
   // draggingClasses: Styles applied when the tile is being dragged (opacity, background color, border consistency, shadow)
   const draggingClasses = isDragging ? 'opacity-50 bg-gray-200 border-black' : 'opacity-100 bg-white shadow-sm';
 
@@ -369,7 +370,7 @@ function App() {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5, // Drag starts after the pointer moves 5px
+        distance: 8, // Drag starts after the pointer moves 8px (increased from 5 for better touch handling)
       },
     }),
     useSensor(KeyboardSensor, {}) // Enables keyboard dragging
@@ -449,45 +450,35 @@ function App() {
 
     // Find the tile being hovered over (if the overId is a tile ID)
     const overTile = tiles.find(tile => tile.id === overId);
-    // Check if the element being hovered over is a tile and if that tile is in the Unassigned column
-    const isOverTileInUnassigned = overTile && overTile.positionId === POSITIONS.UNASSIGNED;
 
-
-    // Determine the actual destination column ID and if dropped over a tile in Unassigned
+    // Determine the actual destination column ID
     let destinationColumnId = null;
     let droppedOverTileInUnassigned = null; // To store the tile being dropped over in unassigned
 
-    // ** Prioritized handling for dragging from a single-tile zone to Unassigned **
-    // If the drag started from a single-tile zone (not Unassigned)
-    // AND the overId is the Unassigned column ID OR the overId is a tile within the Unassigned column,
-    // we explicitly set the destination to Unassigned and handle sorting within Unassigned.
-    if (sourcePositionId !== POSITIONS.UNASSIGNED && (overId === POSITIONS.UNASSIGNED || isOverTileInUnassigned)) {
-        console.log(`Detected drop into Unassigned from single-tile zone (${sourcePositionId}). Setting destination to Unassigned.`);
-        destinationColumnId = POSITIONS.UNASSIGNED;
-        // If dropped over a tile in Unassigned, store that tile
-        if (isOverTileInUnassigned) {
-            droppedOverTileInUnassigned = overTile;
-        }
-    } else if (columns[overId]) {
-        // If the overId is a known column/zone ID (Drummer, Sweep, or a Bench position) - Updated check
+    if (columns[overId]) {
+        // Scenario 1: The item is dropped directly onto a droppable zone (e.g., 'drummer', 'bench-1-left', or the 'unassigned' container itself)
         destinationColumnId = overId;
-    } else {
-         // If the overId is not a column ID, check if it's a tile within the Unassigned column (fallback)
-        const tileInUnassigned = tiles.find(tile => tile.id === overId && tile.positionId === POSITIONS.UNASSIGNED);
-        if (tileInUnassigned) {
-            destinationColumnId = POSITIONS.UNASSIGNED;
-            droppedOverTileInUnassigned = tileInUnassigned;
-        } else {
-             // If the overId is a tile but not in the Unassigned column, it's an invalid drop target
-             console.error(`Invalid drop target: overId is a tile (${overId}) not in Unassigned.`);
-             return; // Exit if the drop is invalid
+        console.log(`Drop scenario 1: Dropped onto zone ID '${overId}'. Destination is '${destinationColumnId}'.`);
+    } else if (overTile) {
+        // Scenario 2: The item is dropped onto another tile.
+        // The destination column is the positionId of the tile being dropped on.
+        destinationColumnId = overTile.positionId;
+        console.log(`Drop scenario 2: Dropped onto tile '${overTile.id}' which is in position '${overTile.positionId}'. Destination is '${destinationColumnId}'.`);
+        if (destinationColumnId === POSITIONS.UNASSIGNED) {
+            droppedOverTileInUnassigned = overTile; // This is for sorting within the Unassigned column
         }
+    } else {
+        // Scenario 3: The drop target is neither a recognized zone ID nor a tile ID.
+        console.error(`Invalid drop target: overId '${overId}' is not a known zone or tile.`);
+        return; // Exit if the drop target is invalid
     }
 
-
-    // If we couldn't determine a valid destination column (shouldn't happen if source is valid), return
-    if (!destinationColumnId || !columns[sourcePositionId]) {
-         console.error("Invalid drag operation: Could not determine valid source or final destination position.");
+    // If we couldn't determine a valid destination column or source column, or if the destination isn't a valid column key, log an error and return.
+    if (!destinationColumnId || !columns[destinationColumnId] || !columns[sourcePositionId]) {
+         console.error("Invalid drag operation: Could not determine valid source or final destination position, or destination is not a valid column key.");
+         console.log("Source Position ID:", sourcePositionId);
+         console.log("Determined Destination Column ID:", destinationColumnId);
+         console.log("Is destinationColumnId a key in columns?", !!columns[destinationColumnId]);
          console.log("Columns state:", columns);
          return;
     }
@@ -793,7 +784,7 @@ function App() {
           {/* This div now holds the Unassigned column and the rest of the layout */}
           {/* Added flex-grow to ensure it takes the remaining space */}
           {/* Reduced p-8 to p-4 and space-x-8 to space-x-4 for tighter layout */}
-          <div className="flex flex-grow p-4 space-x-4"> {/* flex: enables flexbox, flex-grow: allows it to take remaining space, p-4: padding, space-x-4: horizontal space */}
+          <div className="flex flex-grow p-4 space-x-4 items-start"> {/* flex: enables flexbox, flex-grow: allows it to take remaining space, p-4: padding, space-x-4: horizontal space, items-start: align items to top */}
               {/* Container for the Unassigned column */}
               {/* Unassigned column uses the UnassignedColumn component */}
               <UnassignedColumn
