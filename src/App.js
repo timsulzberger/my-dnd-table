@@ -7,7 +7,9 @@ import {
   useSensors, // Hook to combine multiple sensors
   PointerSensor, // Sensor that responds to pointer events (mouse, touch)
   KeyboardSensor, // Sensor that responds to keyboard events
+  // Import collision detection strategies
   closestCenter, // Collision detection algorithm: finds the closest droppable center
+  rectIntersection, // Collision detection algorithm: detects overlapping rectangles
   useDroppable, // Hook to make an element a droppable zone
 } from '@dnd-kit/core';
 // Import necessary hooks and utilities from @dnd-kit/sortable
@@ -20,6 +22,9 @@ import {
 // Import CSS utility for applying transforms
 import { CSS } from '@dnd-kit/utilities';
 
+// Import the new Sidebar component
+import Sidebar from './Sidebar';
+
 // Remove the old CSS import - styling is now handled by Tailwind classes
 // import './App.css';
 
@@ -28,11 +33,11 @@ const POSITIONS = {
     DRUMMER: 'drummer',
     SWEEP: 'sweep',
     UNASSIGNED: 'unassigned',
-    ROW: 'row', // Prefix for row positions (e.g., 'row-1-left')
+    BENCH: 'bench', // Prefix for bench positions (e.g., 'bench-1-left') - Renamed from ROW
 };
 
-// Helper function to generate unique IDs for row positions
-const generateRowPositionId = (row, side) => `${POSITIONS.ROW}-${row}-${side}`;
+// Helper function to generate unique IDs for bench positions - Updated to use 'bench'
+const generateBenchPositionId = (row, side) => `${POSITIONS.BENCH}-${row}-${side}`;
 
 // Initial data for the tiles
 // Creates an array of 22 tile objects with unique IDs and initial positions
@@ -48,17 +53,18 @@ const initialTiles = Array.from({ length: 22 }, (v, k) => {
       positionId = POSITIONS.SWEEP;
   }
   else {
-      // Assigns the remaining tiles to the left/right row positions
+      // Assigns the remaining tiles to the left/right bench positions - Updated to use generateBenchPositionId
       const adjustedIndex = k - 2; // Adjusts the index to start from 0 for row calculations
       const row = Math.floor(adjustedIndex / 2) + 1; // Calculates the row number (1-based)
       const side = adjustedIndex % 2 === 0 ? 'left' : 'right'; // Determines if it's a left or right side position
-      positionId = generateRowPositionId(row, side); // Generates the specific row position ID
+      positionId = generateBenchPositionId(row, side); // Generates the specific bench position ID
   }
 
   return {
     id: tileId,
-    content: `Tile ${k + 1}`, // Content displayed on the tile
-    note: `Note for tile ${k + 1}`, // Additional note for the tile
+    // Removed original content field as it's no longer displayed
+    // content: `Tile ${k + 1}`, // Content displayed on the tile
+    preference: ``, // Added preference field, initially empty
     positionId: positionId, // Stores the tile's current position ID
     paddlerName: `Person ${k + 1}`, // Default paddler name
   };
@@ -66,7 +72,7 @@ const initialTiles = Array.from({ length: 22 }, (v, k) => {
 
 
 // Component for a single draggable tile
-function SortableItem({ id, content, note, paddlerName, currentPositionId, currentIndex, onPaddlerNameChange }) {
+function SortableItem({ id, paddlerName, preference, currentPositionId, currentIndex, onPaddlerNameChange, onPreferenceChange }) {
   // useSortable hook provides properties and methods for making the item sortable
   const {
     attributes, // HTML attributes needed for accessibility and drag/drop
@@ -85,15 +91,15 @@ function SortableItem({ id, content, note, paddlerName, currentPositionId, curre
 
   // Tailwind classes for styling the tile
   // baseClasses: Common styles for all tiles (padding, rounded corners, cursor, flex layout, transition, solid black border)
-  const baseClasses = `p-4 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-black`;
+  const baseClasses = `p-2 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-black`; // Reduced padding
   // draggingClasses: Styles applied when the tile is being dragged (opacity, background color, border consistency, shadow)
   const draggingClasses = isDragging ? 'opacity-50 bg-gray-200 border-black' : 'opacity-100 bg-white shadow-sm';
 
   // positionSpecificClasses: Styles that vary based on the tile's current position (margin, width, text alignment)
   // Reduced mb-2 to mb-1 for tighter vertical spacing between tiles in lists
   const positionSpecificClasses = currentPositionId === POSITIONS.UNASSIGNED ? 'mb-1 w-full max-w-[150px] mx-auto text-left' // Styles for tiles in the Unassigned column
-                                : (currentPositionId === POSITIONS.DRUMMER || currentPositionId === POSITIONS.SWEEP ? 'mb-0 w-full max-w-[calc(100%-32px)] mx-auto text-center' // Styles for tiles in Drummer or Sweep (single-tile zones)
-                                : 'mb-1 text-left'); // Styles for tiles in the row grid positions
+                                : (currentPositionId === POSITIONS.DRUMMER || currentPositionId === POSITIONS.SWEEP ? 'mb-0 w-full max-w-[calc(100%-16px)] mx-auto text-center' // Styles for tiles in Drummer or Sweep (single-tile zones), adjusted calc
+                                : 'mb-1 text-left w-full'); // Styles for tiles in the row grid positions, added w-full
 
   // Inline style object for applying transform and transition provided by useSortable
   const style = {
@@ -106,21 +112,24 @@ function SortableItem({ id, content, note, paddlerName, currentPositionId, curre
       event.stopPropagation(); // Stops the event from bubbling up to the draggable div
   };
 
-  // Determines the header text displayed on the tile based on its position ID
+  // Determines the header text displayed on the tile based on its position ID - Updated for Bench naming
   let headerText = currentPositionId; // Default header is the position ID
 
   if (currentPositionId === POSITIONS.DRUMMER) {
       headerText = 'Drummer';
   } else if (currentPositionId === POSITIONS.SWEEP) {
       headerText = 'Sweep';
-  } else if (currentPositionId.startsWith(POSITIONS.ROW)) {
-      // Parses row and side from the row position ID to create a user-friendly header
+  } else if (currentPositionId.startsWith(POSITIONS.BENCH)) { // Check for BENCH prefix
+      // Parses row and side from the bench position ID to create a user-friendly header
       const [, row, side] = currentPositionId.split('-');
-      headerText = `Row ${row} ${side.charAt(0).toUpperCase() + side.slice(1)}`;
+      headerText = `Bench ${row} - ${side.charAt(0).toUpperCase() + side.slice(1)}`; // Display "Bench X - Side"
   } else if (currentPositionId === POSITIONS.UNASSIGNED) {
        // For unassigned, we can display the index within the unassigned list
        headerText = `Unassigned Index: ${currentIndex}`; // Uses the currentIndex prop passed from the parent
   }
+
+  // Extract the tile number from the id (e.g., "tile-0" -> 1, "tile-21" -> 22)
+  const tileNumber = id.split('-')[1] ? parseInt(id.split('-')[1]) + 1 : null;
 
 
   return (
@@ -130,25 +139,50 @@ function SortableItem({ id, content, note, paddlerName, currentPositionId, curre
       style={style} // Apply the transform and transition styles
       {...attributes} // Apply accessibility and drag attributes
       {...listeners} // Apply drag event listeners
-      className={`${baseClasses} ${draggingClasses} ${positionSpecificClasses}`} // Combine all Tailwind classes
+      className={`${baseClasses} ${draggingClasses} ${positionSpecificClasses} relative`} // Add relative positioning for absolute positioning of the tile number
     >
-      {/* Display the formatted header */}
-      <div className="font-semibold mb-2 text-gray-700">{headerText}</div>
-      {/* Display the tile content */}
-      <div className="text-gray-800">{content}</div>
-      {/* Display the tile note */}
-      <div className="text-gray-600 text-sm">{note}</div>
-      {/* Paddler Name Input */}
-      <div className="mt-2" onMouseDown={handleInputMouseDown}> {/* Container for the input, prevents drag start */}
-        <label htmlFor={`paddler-${id}`} className="block text-xs text-gray-600 mb-1">Paddler Name:</label> {/* Label for the input field */}
-        <input
-          id={`paddler-${id}`} // Unique ID for the input, linked to the label
-          type="text"
-          value={paddlerName} // Controlled input value
-          onChange={(e) => onPaddlerNameChange(id, e.target.value)} // Call parent handler on change
-          className="p-1 rounded border border-gray-300 text-sm text-gray-800 w-full focus:outline-none focus:ring-1 focus:ring-blue-500" // Tailwind classes for input styling and focus effect
-        />
+      {/* Container for main content, using flex-col for vertical stacking */}
+      <div className="flex flex-col flex-grow"> {/* flex-grow allows this section to take up space */}
+          {/* Display the formatted header */}
+          <div className="font-semibold mb-2 text-gray-700">{headerText}</div>
+
+          {/* Paddler Name Input - Moved to the top */}
+          <div className="mt-1 mb-2" onMouseDown={handleInputMouseDown}> {/* Container for the input, prevents drag start, added margin-bottom */}
+            <label htmlFor={`paddler-${id}`} className="block text-xs text-gray-600 mb-1">Name:</label> {/* Label changed to "Name:" */}
+            <input
+              id={`paddler-${id}`} // Unique ID for the input, linked to the label
+              type="text"
+              value={paddlerName} // Controlled input value
+              onChange={(e) => onPaddlerNameChange(id, e.target.value)} // Call parent handler on change
+              className="p-1 rounded border border-gray-300 text-sm text-gray-800 w-full focus:outline-none focus:ring-1 focus:ring-blue-500" // Tailwind classes for input styling and focus effect
+            />
+          </div>
+
+          {/* Preference Input Field */}
+          <div className="mt-1 mb-2" onMouseDown={handleInputMouseDown}> {/* Container for the input, prevents drag start, added margin-bottom */}
+            <label htmlFor={`preference-${id}`} className="block text-xs text-gray-600 mb-1">Preference:</label> {/* Label for the preference field */}
+            <input
+              id={`preference-${id}`} // Unique ID for the input
+              type="text"
+              value={preference} // Controlled input value
+              onChange={(e) => onPreferenceChange(id, e.target.value)} // Call parent handler on change
+              className="p-1 rounded border border-gray-300 text-sm text-gray-800 w-full focus:outline-none focus:ring-1 focus:ring-blue-500" // Tailwind classes for input styling and focus effect
+            />
+          </div>
+
+          {/* Removed the div displaying the original tile content */}
+          {/* <div className="text-gray-800">{content}</div> */}
+          {/* Removed the div displaying the original tile note */}
+          {/* <div className="text-gray-600 text-sm">{note}</div> */}
+
       </div>
+
+      {/* Tile Number at bottom left */}
+      {tileNumber !== null && ( // Only render if tileNumber is successfully extracted
+        <div className="absolute bottom-1 left-1 text-gray-400 text-[6pt] py-0.5"> {/* Absolute positioning, bottom/left offset, lighter grey text, 6pt font, vertical padding */}
+          {`Tile ID ${tileNumber}`} {/* Display "Tile ID" followed by the number */}
+        </div>
+      )}
     </div>
   );
 }
@@ -159,17 +193,18 @@ function DroppableZone({ children, id, label, occupiedTileId }) {
   const { setNodeRef, isOver } = useDroppable({ id }); // The unique ID of the droppable zone
 
   // Tailwind classes for styling the droppable zone
-  // baseClasses: Common styles (padding, margin, rounded corners, flex layout, min height, transition, dotted gray border)
-  // Reduced m-1 to m-0.5 for tighter spacing around droppable zones
-  const baseClasses = `p-2 m-0.5 rounded-md flex flex-col items-center justify-center min-h-[100px] transition-colors duration-200 ease-in-out border border-dotted border-gray-400`;
+  // baseClasses: Common styles (padding, margin, rounded corners, flex layout, transition, dotted gray border)
+  // Removed min-height to allow grid/flex to control height, adjusted padding
+  const baseClasses = `p-1 m-0.5 rounded-md flex flex-col items-center justify-center transition-colors duration-200 ease-in-out border border-dotted border-gray-400`;
   // stateClasses: Styles that change based on drag state (border and background color when dragging over, or based on occupied status)
-  const stateClasses = isOver ? 'border-2 border-black bg-gray-200' : (occupiedTileId ? 'bg-red-100 border-red-300' : 'bg-green-100 border-green-300');
+  // Updated background colors to light grey shades
+  const stateClasses = isOver ? 'border-2 border-black bg-gray-200' : (occupiedTileId ? 'bg-gray-100 border-gray-300' : 'bg-gray-50 border-gray-200');
 
   return (
     // The main div for the droppable zone, connected to dnd-kit via setNodeRef
     <div
       ref={setNodeRef}
-      className={`${baseClasses} ${stateClasses}`} // Combine all Tailwind classes
+      className={`${baseClasses} ${stateClasses} h-full`} // Combine all Tailwind classes, added h-full
     >
       {/* Show the label if the zone is empty */}
       {!occupiedTileId && <div className="text-gray-600 text-sm">{label}</div>}
@@ -198,7 +233,8 @@ function UnassignedColumn({ children, id, title, tileIds }) {
           className={`${baseClasses} ${stateClasses}`} // Combine all Tailwind classes
         >
           {/* Display the column title */}
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">{title}</h2>
+          {/* Reduced mb-4 to mb-2 for tighter spacing below the title */}
+          <h2 className="text-xl font-semibold mb-2 text-gray-800">{title}</h2>
           {/* SortableContext makes the children within this context sortable */}
           {/* items: Array of IDs of the sortable items */}
           {/* strategy: The sorting algorithm to use */}
@@ -209,6 +245,20 @@ function UnassignedColumn({ children, id, title, tileIds }) {
         </div>
     );
 }
+
+// Custom collision detection strategy that combines rectIntersection and closestCenter
+const customCollisionDetection = (args) => {
+    // First, use rectIntersection for precise detection over droppable areas
+    const rectCollisions = rectIntersection(args);
+
+    // If rectIntersection finds collisions, return them
+    if (rectCollisions.length > 0) {
+        return rectCollisions;
+    }
+
+    // If no rectIntersection collisions, fall back to closestCenter
+    return closestCenter(args);
+};
 
 
 // The main App component
@@ -228,10 +278,10 @@ function App() {
           [POSITIONS.UNASSIGNED]: { id: POSITIONS.UNASSIGNED, title: 'Unassigned', tileIds: [] },
           [POSITIONS.DRUMMER]: { id: POSITIONS.DRUMMER, title: 'Drummer', tileIds: [] },
           [POSITIONS.SWEEP]: { id: POSITIONS.SWEEP, title: 'Sweep', tileIds: [] },
-          // Dynamically generate entries for each row position (e.g., 'row-1-left', 'row-1-right')
+          // Dynamically generate entries for each bench position (e.g., 'bench-1-left', 'bench-1-right') - Updated to use generateBenchPositionId
           ...Array.from({ length: 10 }).reduce((acc, _, rowIndex) => {
-              acc[generateRowPositionId(rowIndex + 1, 'left')] = { id: generateRowPositionId(rowIndex + 1, 'left'), title: `Row ${rowIndex + 1} Left`, tileIds: [] };
-              acc[generateRowPositionId(rowIndex + 1, 'right')] = { id: generateRowPositionId(rowIndex + 1, 'right'), title: `Row ${rowIndex + 1} Right`, tileIds: [] };
+              acc[generateBenchPositionId(rowIndex + 1, 'left')] = { id: generateBenchPositionId(rowIndex + 1, 'left'), title: `Bench ${rowIndex + 1} Left`, tileIds: [] }; // Updated title
+              acc[generateBenchPositionId(rowIndex + 1, 'right')] = { id: generateBenchPositionId(rowIndex + 1, 'right'), title: `Bench ${rowIndex + 1} Right`, tileIds: [] }; // Updated title
               return acc;
           }, {}),
       };
@@ -277,6 +327,16 @@ function App() {
     );
   };
 
+  // Handler for changes to the Preference input field
+  const handlePreferenceChange = (tileId, newPreference) => {
+      setTiles(prevTiles =>
+          prevTiles.map(tile =>
+              tile.id === tileId ? { ...tile, preference: newPreference } : tile
+          )
+      );
+  };
+
+
   // Handler for when a drag operation starts
   const onDragStart = (event) => {
     setActiveId(event.active.id); // Set the activeId to the ID of the dragged item
@@ -288,10 +348,6 @@ function App() {
 
     setActiveId(null); // Clear the activeId as the drag has ended
 
-    // Log the active and over objects for debugging purposes
-    console.log("Drag ended. Active:", active);
-    console.log("Drag ended. Over:", over);
-
     // Dropped outside a droppable area or over the same item
     if (!over || active.id === over.id) {
       console.log(!over ? "Dropped outside any droppable area." : "Dropped onto the same item.");
@@ -301,10 +357,6 @@ function App() {
     const draggedTileId = active.id; // Get the ID of the dragged tile
     const sourcePositionId = active.data.current?.currentPositionId; // Get the original position ID from the active item's data
     const overId = over.id; // Get the ID of the element being dragged over
-
-    console.log("Dragged Tile ID:", draggedTileId);
-    console.log("Source Position ID:", sourcePositionId);
-    console.log("Over ID:", overId); // Log the overId for debugging
 
 
     // Find the tile that was dragged
@@ -324,35 +376,24 @@ function App() {
     let destinationColumnId = null;
     let droppedOverTileInUnassigned = null; // To store the tile being dropped over in unassigned
 
-    // ** Prioritized handling for dragging from a single-tile zone to Unassigned **
-    // If the drag started from a single-tile zone (not Unassigned)
-    // AND the overId is the Unassigned column ID OR the overId is a tile within the Unassigned column,
-    // we explicitly set the destination to Unassigned and handle sorting within Unassigned.
-    if (sourcePositionId !== POSITIONS.UNASSIGNED && (overId === POSITIONS.UNASSIGNED || isOverTileInUnassigned)) {
-        console.log(`Detected drop into Unassigned from single-tile zone (${sourcePositionId}). Setting destination to Unassigned.`);
+    // ** Revised logic for determining destinationColumnId with combined collision detection **
+    // Prioritize checking if the overId is the Unassigned column itself or a known column/zone ID
+    if (overId === POSITIONS.UNASSIGNED) {
         destinationColumnId = POSITIONS.UNASSIGNED;
-        // If dropped over a tile in Unassigned, store that tile
-        if (isOverTileInUnassigned) {
-            droppedOverTileInUnassigned = overTile;
-        }
     } else if (columns[overId]) {
-        // If the overId is a known column/zone ID (Drummer, Sweep, or a Row position)
         destinationColumnId = overId;
+    } else if (isOverTileInUnassigned) {
+         // If dropped over a tile that is *already* in the Unassigned column (fallback)
+        destinationColumnId = POSITIONS.UNASSIGNED;
+        droppedOverTileInUnassigned = overTile; // Store the tile being dropped over
     } else {
-         // If the overId is not a column ID, check if it's a tile within the Unassigned column (fallback)
-        const tileInUnassigned = tiles.find(tile => tile.id === overId && tile.positionId === POSITIONS.UNASSIGNED);
-        if (tileInUnassigned) {
-            destinationColumnId = POSITIONS.UNASSIGNED;
-            droppedOverTileInUnassigned = tileInUnassigned;
-        } else {
-             // If the overId is a tile but not in the Unassigned column, it's an invalid drop target
-             console.error(`Invalid drop target: overId is a tile (${overId}) not in Unassigned.`);
-             return; // Exit if the drop is invalid
-        }
+         // If the overId is a tile but not in the Unassigned column, it's an invalid drop target
+         console.error(`Invalid drop target: overId is a tile (${overId}) not in Unassigned.`);
+         return; // Exit if the drop is invalid
     }
 
 
-    // If we couldn't determine a valid destination column (shouldn't happen if source is valid), return
+    // If we couldn't determine a valid destination column after the special handling, return
     if (!destinationColumnId || !columns[sourcePositionId]) {
          console.error("Invalid drag operation: Could not determine valid source or final destination position.");
          console.log("Columns state:", columns);
@@ -363,7 +404,7 @@ function App() {
     const destinationTileIds = Array.from(destinationColumn.tileIds); // Get the current tile IDs in the destination column
 
 
-    // ** Logic for dropping onto a single-tile zone (Drummer, Sweep, or Row Position) **
+    // ** Logic for dropping onto a single-tile zone (Drummer, Sweep, or Bench Position) **
     // These zones should only hold one tile at a time (except Unassigned)
     const isSingleTileDestination = destinationColumnId !== POSITIONS.UNASSIGNED;
 
@@ -447,7 +488,6 @@ function App() {
 
     } else {
         // ** Logic for dropping into the Unassigned column (which is a sortable list) **
-        // This block handles drags that started from the Unassigned column OR were redirected to Unassigned
         console.log("Dropped into Unassigned column.");
 
         // Get the current tile IDs for the unassigned column
@@ -456,16 +496,16 @@ function App() {
         // Determine the drop index within the unassigned list
         let dropIndexInUnassigned = currentUnassignedTileIds.length; // Default to end if dropped on container
 
+        // If dropped over a specific tile within the unassigned list, determine the index
         if (droppedOverTileInUnassigned) {
-             // Dropped over a specific tile within the unassigned list
              dropIndexInUnassigned = currentUnassignedTileIds.indexOf(droppedOverTileInUnassigned.id);
              // Adjust index if moving within unassigned and dropping below original position
              if (sourcePositionId === POSITIONS.UNASSIGNED && currentUnassignedTileIds.indexOf(draggedTileId) !== -1 && dropIndexInUnassigned > currentUnassignedTileIds.indexOf(draggedTileId)) {
                  dropIndexInUnassigned--;
              }
         } else if (overId === POSITIONS.UNASSIGNED) { // Explicitly check if dropped on the Unassigned container
-             // Dropped directly onto the Unassigned column container
-             dropIndexInUnassigned = currentUnassignedTileIds.length; // Add to the end
+             // Dropped directly onto the Unassigned column container, add to the end
+             dropIndexInUnassigned = currentUnassignedTileIds.length;
         } else {
             // This case should ideally not be reached with the updated logic,
             // but as a fallback, log an error and return.
@@ -551,7 +591,7 @@ function App() {
    // Handler for when a drag operation is cancelled
    const onDragCancel = () => {
     setActiveId(null); // Clear active dragged item if drag is cancelled
-  };
+   };
 
    // Handler for the "Unassign All" button click
    const handleUnassignAll = () => {
@@ -592,15 +632,15 @@ function App() {
 
         // Update the row property for all tiles in the unassigned column based on the new order
          const tilesInUnassigned = nextTiles.filter(tile => tile.positionId === POSITIONS.UNASSIGNED)
-              .sort((a, b) => nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(a.id) - nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(b.id));
+               .sort((a, b) => nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(a.id) - nextColumns[POSITIONS.UNASSIGNED].tileIds.indexOf(b.id));
 
-          tilesInUnassigned.forEach((tile, index) => {
-              const tileToUpdate = nextTiles.find(t => t.id === tile.id);
-              if(tileToUpdate) tileToUpdate.row = index;
-          });
+           tilesInUnassigned.forEach((tile, index) => {
+               const tileToUpdate = nextTiles.find(t => t.id === tile.id);
+               if(tileToUpdate) tileToUpdate.row = index;
+           });
 
 
-       // Update the state with the new columns and tiles data
+       // Update state with the new columns and tiles data
        setColumns(nextColumns);
        setTiles(nextTiles);
 
@@ -616,50 +656,39 @@ function App() {
   // Find the active tile data for the DragOverlay
   const activeTile = activeId ? getTileById(activeId) : null;
 
+  // Determine the left margin for the main content based on sidebar state
+  // w-16 (64px) when collapsed, w-64 (256px) when expanded
+  const mainContentMarginLeft = isSidebarExpanded ? 'ml-64' : 'ml-16';
+
 
   return (
     // DndContext provides the drag and drop context to the application
     <DndContext
       sensors={sensors} // Pass the configured sensors
-      collisionDetection={closestCenter} // Use the closestCenter collision detection algorithm
+      // Use the custom collision detection strategy
+      collisionDetection={customCollisionDetection}
       onDragStart={onDragStart} // Call onDragStart when a drag begins
       onDragEnd={onDragEnd} // Call onDragEnd when a drag ends
       onDragCancel={onDragCancel} // Call onDragCancel when a drag is cancelled
     >
       {/* Main layout container using Tailwind flexbox for side-by-side layout */}
       {/* Added a parent flex container to hold the sidebar and the main content */}
-      <div className="flex min-h-screen"> {/* flex: enables flexbox, min-h-screen: minimum height of the viewport */}
-          {/* Left Sidebar Menu - uses conditional classes for width and transition */}
-          <div className={`bg-gray-100 p-4 flex flex-col space-y-4 transition-all duration-300 ease-in-out ${isSidebarExpanded ? 'w-64' : 'w-16 items-center'}`}> {/* Conditional width (w-64 expanded, w-16 collapsed), background, padding, flex column layout, vertical space, transition */}
-              {/* Toggle Button for Sidebar */}
-              {/* Using a simple button for now, could be an icon */}
-              <button
-                  onClick={toggleSidebar} // Attach the toggle handler
-                  className="mb-4 p-2 rounded bg-blue-500 hover:bg-blue-700 text-white font-bold" // Styling for the toggle button
-              >
-                  {isSidebarExpanded ? 'Collapse' : 'Expand'} {/* Button text changes based on state */}
-              </button>
+      {/* Added items-start to align items to the top */}
+      <div className="flex min-h-screen items-start"> {/* flex: enables flexbox, min-h-screen: minimum height of the viewport, items-start: aligns items to the top */}
 
-              {/* Sidebar Content */}
-              {/* Unassign All Button - conditionally show text based on expanded state */}
-              <button
-                  onClick={handleUnassignAll} // Attach the click handler
-                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded flex items-center justify-center" // Tailwind classes for button styling, added flex for centering
-              >
-                  {/* You might add an icon here */}
-                  {isSidebarExpanded ? 'Unassign All' : 'Unassign'} {/* Button text changes based on state */}
-              </button>
-              {/* Add other sidebar items here if needed */}
-              {/* Example of another item, text hidden when collapsed */}
-              {isSidebarExpanded && (
-                  <div className="text-gray-700 mt-4">Other Menu Item</div>
-              )}
-          </div>
+          {/* Render the Sidebar component, passing necessary props */}
+          <Sidebar
+              isExpanded={isSidebarExpanded} // Pass the expanded state
+              toggleSidebar={toggleSidebar} // Pass the toggle function
+              handleUnassignAll={handleUnassignAll} // Pass the unassign all function
+          />
 
           {/* Container for the Unassigned column and the main content */}
           {/* This div now holds the Unassigned column and the rest of the layout */}
           {/* Added flex-grow to ensure it takes the remaining space */}
-          <div className="flex flex-grow p-8 space-x-8"> {/* flex: enables flexbox, flex-grow: allows it to take remaining space, p-8: padding, space-x-8: horizontal space between children */}
+          {/* Added conditional left margin based on sidebar state */}
+          {/* Added pl-4 for left padding */}
+          <div className={`flex flex-grow p-8 space-x-8 ${mainContentMarginLeft} pl-4`}> {/* flex: enables flexbox, flex-grow: allows it to take remaining space, p-8: padding, space-x-8: horizontal space between children, conditional left margin, pl-4: left padding */}
               {/* Container for the Unassigned column */}
               {/* Unassigned column uses the UnassignedColumn component */}
               <UnassignedColumn
@@ -677,19 +706,22 @@ function App() {
                            <SortableItem
                                key={tileId} // Unique key for React list rendering
                                id={tileId} // ID for dnd-kit sortable item
-                               content={tile.content} // Pass tile content
-                               note={tile.note} // Pass tile note
+                               // Removed content prop
+                               preference={tile.preference} // Pass preference prop
                                paddlerName={tile.paddlerName} // Pass paddler name
                                currentPositionId={POSITIONS.UNASSIGNED} // Pass the current position ID
                                currentIndex={index} // Pass index for sorting and header
                                onPaddlerNameChange={handlePaddlerNameChange} // Pass the handler for name changes
+                               onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
                            />
                        );
                    })}
               </UnassignedColumn>
 
               {/* Container for the drummer, main grid, and sweep - uses Tailwind flexbox for vertical stacking */}
-              <div className="main-content-container flex flex-col space-y-8 flex-grow"> {/* flex: enables flexbox, flex-col: stacks children vertically, space-y-8: vertical space between children, flex-grow: allows the container to grow */}
+              {/* Added max-w-lg to make this section narrower */}
+              {/* Added flex-grow to ensure it takes available vertical space */}
+              <div className="main-content-container flex flex-col space-y-8 flex-grow max-w-lg"> {/* flex: enables flexbox, flex-col: stacks children vertically, space-y-8: vertical space between children, flex-grow: allows the container to grow, max-w-lg: sets a maximum width */}
                   {/* Drummer Droppable Zone */}
                   <DroppableZone
                       key={POSITIONS.DRUMMER} // Unique key
@@ -706,67 +738,72 @@ function App() {
                                <SortableItem
                                    key={tileId}
                                    id={tileId}
-                                   content={tile.content}
-                                   note={tile.note}
-                                   paddlerName={tile.paddlerName}
+                                   // Removed content prop
+                                   preference={tile.preference} // Pass preference prop
+                                   paddlerName={tile.paddlerName} // Pass paddler name
                                    currentPositionId={POSITIONS.DRUMMER} // Pass the current position ID
                                    onPaddlerNameChange={handlePaddlerNameChange}
+                                   onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
                                />
                            );
                        })}
                   </DroppableZone>
 
                   {/* Main Grid Container for Left/Right Rows - uses Tailwind CSS Grid */}
-                  <div className="main-grid-container grid grid-cols-2 gap-4 flex-grow"> {/* grid: enables grid layout, grid-cols-2: two equal columns, gap-4: space between grid items, flex-grow: allows the grid to grow */}
+                  {/* Added grid-rows-10 to explicitly define row count and ensure consistent height */}
+                  {/* Added flex-grow to ensure the grid takes available vertical space */}
+                  <div className="main-grid-container grid grid-cols-2 grid-rows-10 gap-4 flex-grow"> {/* grid: enables grid layout, grid-cols-2: two equal columns, grid-rows-10: 10 rows of equal height, gap-4: space between grid items, flex-grow: allows the grid to grow */}
                     {/* Loop through rows (1 to 10) and render Left/Right Droppable Zones */}
                     {Array.from({ length: 10 }).map((_, rowIndex) => (
                         <React.Fragment key={rowIndex}> {/* Use Fragment to group the left and right zones for each row without adding extra DOM nodes */}
-                            {/* Left Row Droppable Zone */}
+                            {/* Left Bench Droppable Zone - Updated ID and Label */}
                             <DroppableZone
-                                key={generateRowPositionId(rowIndex + 1, 'left')} // Unique key for the left zone
-                                id={generateRowPositionId(rowIndex + 1, 'left')} // ID for dnd-kit droppable zone
-                                label={`Row ${rowIndex + 1} Left`} // Label
-                                occupiedTileId={columns[generateRowPositionId(rowIndex + 1, 'left')]?.tileIds[0]} // ID of the tile in this zone
+                                key={generateBenchPositionId(rowIndex + 1, 'left')} // Updated key
+                                id={generateBenchPositionId(rowIndex + 1, 'left')} // Updated ID
+                                label={`Bench ${rowIndex + 1} Left`} // Updated Label
+                                occupiedTileId={columns[generateBenchPositionId(rowIndex + 1, 'left')]?.tileIds[0]} // Updated occupiedTileId check
                             >
-                                {/* Render the tile if it's in this left row position */}
-                                {columns[generateRowPositionId(rowIndex + 1, 'left')]?.tileIds.map(tileId => {
+                                {/* Render the tile if it's in this left bench position - Updated positionId check */}
+                                {columns[generateBenchPositionId(rowIndex + 1, 'left')]?.tileIds.map(tileId => {
                                     const tile = getTileById(tileId);
                                     if (!tile) return null;
                                     return (
-                                        // Render a SortableItem for the tile in this zone
+                                        // Render a SortableItem for the tile in this zone - Updated currentPositionId
                                         <SortableItem
                                             key={tileId}
                                             id={tileId}
-                                            content={tile.content}
-                                            note={tile.note}
-                                            paddlerName={tile.paddlerName}
-                                            currentPositionId={generateRowPositionId(rowIndex + 1, 'left')} // Pass the current position ID
+                                            // Removed content prop
+                                            preference={tile.preference} // Pass preference prop
+                                            paddlerName={tile.paddlerName} // Pass paddler name
+                                            currentPositionId={generateBenchPositionId(rowIndex + 1, 'left')} // Updated currentPositionId
                                             onPaddlerNameChange={handlePaddlerNameChange}
+                                            onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
                                         />
                                     );
                                 })}
                             </DroppableZone>
-                            {/* Right Row Droppable Zone */}
+                            {/* Right Bench Droppable Zone - Updated ID and Label */}
                             <DroppableZone
-                                key={generateRowPositionId(rowIndex + 1, 'right')} // Unique key for the right zone
-                                id={generateRowPositionId(rowIndex + 1, 'right')} // ID for dnd-kit droppable zone
-                                label={`Row ${rowIndex + 1} Right`} // Label
-                                occupiedTileId={columns[generateRowPositionId(rowIndex + 1, 'right')]?.tileIds[0]} // ID of the tile in this zone
+                                key={generateBenchPositionId(rowIndex + 1, 'right')} // Updated key
+                                id={generateBenchPositionId(rowIndex + 1, 'right')} // Updated ID
+                                label={`Bench ${rowIndex + 1} Right`} // Updated Label
+                                occupiedTileId={columns[generateBenchPositionId(rowIndex + 1, 'right')]?.tileIds[0]} // Updated occupiedTileId check
                             >
-                                {/* Render the tile if it's in this right row position */}
-                                {columns[generateRowPositionId(rowIndex + 1, 'right')]?.tileIds.map(tileId => {
+                                {/* Render the tile if it's in this right bench position - Updated positionId check */}
+                                {columns[generateBenchPositionId(rowIndex + 1, 'right')]?.tileIds.map(tileId => {
                                     const tile = getTileById(tileId);
                                     if (!tile) return null;
                                     return (
-                                        // Render a SortableItem for the tile in this zone
+                                        // Render a SortableItem for the tile in this zone - Updated currentPositionId
                                         <SortableItem
                                             key={tileId}
                                             id={tileId}
-                                            content={tile.content}
-                                            note={tile.note}
-                                            paddlerName={tile.paddlerName}
-                                            currentPositionId={generateRowPositionId(rowIndex + 1, 'right')} // Pass the current position ID
+                                            // Removed content prop
+                                            preference={tile.preference} // Pass preference prop
+                                            paddlerName={tile.paddlerName} // Pass paddler name
+                                            currentPositionId={generateBenchPositionId(rowIndex + 1, 'right')} // Updated currentPositionId
                                             onPaddlerNameChange={handlePaddlerNameChange}
+                                            onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
                                         />
                                     );
                                 })}
@@ -780,7 +817,7 @@ function App() {
                       key={POSITIONS.SWEEP} // Unique key
                       id={POSITIONS.SWEEP} // ID for dnd-kit droppable zone
                       label="Sweep" // Label
-                      occupiedTileId={columns[POSITIONS.SWEEP]?.tileIds[0]} // ID of the tile in this zone
+                      occupiedTileId={columns[POSITIONS.SWEEP]?.tileIds[0]} // Pass the ID of the tile currently in this single-tile zone
                   >
                        {/* Render the tile if it's in the Sweep position */}
                        {columns[POSITIONS.SWEEP]?.tileIds.map(tileId => {
@@ -791,11 +828,12 @@ function App() {
                                <SortableItem
                                    key={tileId}
                                    id={tileId}
-                                   content={tile.content}
-                                   note={tile.note}
-                                   paddlerName={tile.paddlerName}
+                                   // Removed content prop
+                                   preference={tile.preference} // Pass preference prop
+                                   paddlerName={tile.paddlerName} // Pass paddler name
                                    currentPositionId={POSITIONS.SWEEP} // Pass the current position ID
                                    onPaddlerNameChange={handlePaddlerNameChange}
+                                   onPreferenceChange={handlePreferenceChange} // Pass the handler for preference changes
                                />
                            );
                        })}
@@ -818,16 +856,24 @@ function App() {
                  {activeTile.positionId === POSITIONS.DRUMMER ? 'Drummer'
                   : activeTile.positionId === POSITIONS.SWEEP ? 'Sweep'
                   : activeTile.positionId === POSITIONS.UNASSIGNED ? `Unassigned Index: ${columns[POSITIONS.UNASSIGNED]?.tileIds.indexOf(activeTile.id)}` // Display current index in unassigned
-                  : activeTile.positionId.startsWith(POSITIONS.ROW) ? `Row ${activeTile.positionId.split('-')[1]} ${activeTile.positionId.split('-')[2].charAt(0).toUpperCase() + activeTile.positionId.split('-')[2].slice(1)}`
+                  : activeTile.positionId.startsWith(POSITIONS.BENCH) ? `Bench ${activeTile.positionId.split('-')[1]} - ${activeTile.positionId.split('-')[2].charAt(0).toUpperCase() + activeTile.positionId.split('-')[2].slice(1)}` // Updated display for Bench
                   : activeTile.positionId} {/* Fallback display if position ID is not recognized */}
              </div>
-            <div className="text-gray-800">{activeTile.content}</div> {/* Display tile content */}
-            <div className="text-gray-600 text-sm">{activeTile.note}</div> {/* Display tile note */}
-             {/* Paddler Name in Overlay (read-only) */}
-             <div className="mt-2">
-                <div className="text-xs text-gray-600 mb-1">Paddler Name:</div> {/* Label */}
+             {/* Paddler Name in Overlay (read-only) - Moved to the top */}
+             <div className="mt-1 mb-2"> {/* Container for the input, added margin-bottom */}
+                <div className="text-xs text-gray-600 mb-1">Name:</div> {/* Label changed to "Name:" */}
                 <div>{activeTile.paddlerName}</div> {/* Display the paddler name */}
              </div>
+             {/* Preference in Overlay (read-only) */}
+             <div className="mt-1 mb-2"> {/* Container for the input, added margin-bottom */}
+                <div className="text-xs text-gray-600 mb-1">Preference:</div> {/* Label for the preference field */}
+                <div>{activeTile.preference}</div> {/* Display the preference */}
+             </div>
+            {/* Removed the div displaying the original tile content in the overlay */}
+            {/* <div className="text-gray-800">{content}</div> */}
+            {/* Removed the div displaying the original tile note in the overlay */}
+            {/* <div className="text-gray-600 text-sm">{note}</div> */}
+
           </div>
         ) : null} {/* Render nothing if no item is being dragged */}
       </DragOverlay>
@@ -835,4 +881,5 @@ function App() {
   );
 }
 
-export default App; // Export the App component for use in index.js
+// Ensure this export statement is the very last line in the file.
+export default App;
