@@ -94,15 +94,6 @@ const Sidebar = ({ isExpanded, toggleSidebar, handleUnassignAll }) => {
           {isExpanded && <span>Home</span>}
         </div>
 
-        {/* Dashboard Menu Item */}
-        {/* Call handleMenuItemClick with the action name */}
-        <div className={menuItemClasses} onClick={() => handleMenuItemClick('Dashboard')}>
-           {/* Icon for Dashboard - always show icon */}
-           <span className={`material-icons ${isExpanded ? 'mr-3' : ''}`}>dashboard</span> {/* 'dashboard' icon */}
-          {/* Conditional display: only show text when expanded */}
-          {isExpanded && <span>Dashboard</span>}
-        </div>
-
          {/* Edit Boats Menu Item (with sub-menu) */}
          {/* Call handleMenuItemClick with the action name AND toggle the sub-menu */}
          {/* Use a div for the main menu item that toggles the sub-menu */}
