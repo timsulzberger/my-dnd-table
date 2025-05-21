@@ -238,7 +238,7 @@ function DroppableZone({ children, id, label, activeDroppableId, occupiedTileId 
     // Base state
     'min-h-[60px] min-w-[120px]',
     // Background color based on state
-    occupiedTileId ? 'bg-white' : 'bg-gray-50',
+    occupiedTileId ? 'bg-gray-200' : 'bg-gray-50',
     // Border style based on state
     occupiedTileId ? 'border-solid border-gray-200' : 'border-dashed border-gray-300',
     // Hover state (when not dragging)
@@ -1046,9 +1046,9 @@ function App() {
 
               {/* New container to group Boat 1 elements */}
               {/* Added border and padding for visual grouping */}
-              <div className="boat-container border border-gray-300 rounded-md p-4 flex flex-col space-y-4 flex-grow max-w-lg bg-gray-800"> {/* Added border, rounded corners, padding, and flex-col for vertical stacking */}
+              <div className="boat-container border border-gray-300 rounded-md p-4 flex flex-col space-y-4 flex-grow max-w-lg bg-gray-200"> {/* Added border, rounded corners, padding, and flex-col for vertical stacking */}
                   {/* Label for Boat 1 */}
-                  <h3 className="text-lg font-semibold text-white text-center mb-2">Boat 1</h3> {/* Added text-center and mb-2 */}
+                  <h3 className="text-lg font-semibold text-black text-center mb-2">Boat 1</h3> {/* Added text-center and mb-2 */}
 
                   {/* Container for the drummer, main grid, and sweep - uses Tailwind flexbox for vertical stacking */}
                   {/* Added max-w-lg to make this section narrower */}
