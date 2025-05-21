@@ -515,61 +515,69 @@ function App() {
       );
   };
 
+  // Grid configuration for snap-to-grid
+  const GRID_SIZE = 50; // Size of each grid cell in pixels
+
+  // Function to snap coordinates to the nearest grid point
+  const snapToGrid = (x, y) => {
+    const snappedX = Math.round(x / GRID_SIZE) * GRID_SIZE;
+    const snappedY = Math.round(y / GRID_SIZE) * GRID_SIZE;
+    return { x: snappedX, y: snappedY };
+  };
+
   // Handler for when a drag operation starts
   const onDragStart = (event) => {
-    setActiveId(event.active.id); // Set the activeId to the ID of the dragged item
+    setActiveId(event.active.id);
   };
 
   // Handler for when a drag operation ends
   const onDragEnd = (result) => {
-    const { active, over } = result; // Destructure active (dragged item) and over (item/container being hovered over)
+    const { active, over, delta } = result;
 
-    setActiveId(null); // Clear the activeId as the drag has ended
-    setActiveDroppableId(null); // Clear the active droppable ID
+    setActiveId(null);
+    setActiveDroppableId(null);
 
-    // Log the active and over objects for debugging purposes
-    console.log("Drag ended. Active:", active);
-    console.log("Drag ended. Over:", over);
+    // Apply snap-to-grid to the final position
+    if (delta) {
+      const { x, y } = snapToGrid(delta.x, delta.y);
+      // Update the transform with snapped coordinates
+      result.delta = { x, y };
+    }
 
-    // Dropped outside a droppable area or over the same item
+    // If we couldn't determine the destination, log and return
     if (!over || active.id === over.id) {
-      console.log(!over ? "Dropped outside any droppable area." : "Dropped onto the same item.");
-      return; // Exit the function as no state change is needed
+      console.log("Dropped outside or over same item");
+      return;
     }
 
-    const draggedTileId = active.id; // Get the ID of the dragged tile
-    const sourcePositionId = active.data.current?.currentPositionId; // Get the original position ID from the active item's data
-    const overId = over.id; // Get the ID of the element being dragged over
-
-    console.log("Dragged Tile ID:", draggedTileId);
-    console.log("Source Position ID:", sourcePositionId);
-    console.log("Over ID:", overId); // Log the overId for debugging
-
-    // --- Debugging specific to Drummer/Sweep to Unassigned ---
-    console.log(`--- Drag from ${sourcePositionId} to ${overId} ---`);
-    console.log(`Is overId a known column? ${!!columns[overId]}`);
-    console.log(`Is overId a tile in Unassigned? ${!!tiles.find(tile => tile.id === overId && tile.positionId === POSITIONS.UNASSIGNED)}`);
-    // --- End Debugging specific to Drummer/Sweep to Unassigned ---
-
-    // Find the tile that was dragged
-    const draggedTile = tiles.find(tile => tile.id === draggedTileId);
-    if (!draggedTile) {
-        console.error("Dragged tile not found.");
-        return; // Exit if the dragged tile cannot be found (shouldn't happen in normal operation)
+    // Get the dragged tile and its current position
+    const activeTile = getTileById(active.id);
+    if (!activeTile) {
+      console.error("Active tile not found");
+      return;
     }
 
-    // Find the tile being hovered over (if the overId is a tile ID)
-    const overTile = tiles.find(tile => tile.id === overId);
+    const sourcePositionId = activeTile.positionId;
+    let destinationColumnId = over.id;
+    let droppedOverTileInUnassigned = null;
+    let dropPosition = over.data?.current?.dropPosition;
+    let overTile = null;
 
-    // Determine the actual destination column ID
-    let destinationColumnId = null;
-    let droppedOverTileInUnassigned = null; // To store the tile being dropped over in unassigned
-    let dropPosition = over.data.current?.dropPosition; // Get the drop position data
+    // If we're dropping on a tile, get its position
+    if (over.data?.current?.type === 'tile') {
+      overTile = getTileById(over.id);
+      if (overTile) {
+        destinationColumnId = overTile.positionId;
+        if (destinationColumnId === POSITIONS.UNASSIGNED) {
+          droppedOverTileInUnassigned = overTile;
+        }
+      }
+    }
 
-    if (columns[overId]) {
-        // Scenario 1: The item is dropped directly onto a droppable zone (e.g., 'drummer', 'bench-1-left', or the 'unassigned' container itself)
-        destinationColumnId = overId;
-        console.log(`Drop scenario 1: Dropped onto zone ID '${overId}'. Destination is '${destinationColumnId}'.`);
+    if (columns[over.id]) {
+        // Scenario 1: The item is dropped directly onto a droppable zone
+        destinationColumnId = over.id;
+        console.log(`Drop scenario 1: Dropped onto zone ID '${over.id}'. Destination is '${destinationColumnId}'.`);
         
         // If this is the Unassigned column, use the drop position
         if (destinationColumnId === POSITIONS.UNASSIGNED) {
@@ -593,7 +601,7 @@ function App() {
         }
     } else {
         // Scenario 3: The drop target is neither a recognized zone ID nor a tile ID.
-        console.error(`Invalid drop target: overId '${overId}' is not a known zone or tile.`);
+        console.error(`Invalid drop target: '${over.id}' is not a known zone or tile.`);
         return; // Exit if the drop target is invalid
     }
 
@@ -629,7 +637,7 @@ function App() {
             // Remove dragged tile from source column
             nextColumns[sourcePositionId] = {
                 ...columns[sourcePositionId],
-                tileIds: columns[sourcePositionId].tileIds.filter(id => id !== draggedTileId),
+                tileIds: columns[sourcePositionId].tileIds.filter(id => id !== active.id),
             };
 
             // Add original tile to unassigned column (at the end)
@@ -641,11 +649,10 @@ function App() {
             // Place dragged tile in destination column (it's a single-tile zone, so replace content)
             nextColumns[destinationColumnId] = {
                 ...columns[destinationColumnId],
-                tileIds: [draggedTileId], // Destination now contains only the dragged tile
+                tileIds: [active.id], // Destination now contains only the dragged tile
             };
-
             // Update the positionId for the dragged tile in the nextTiles state
-            const draggedTile = nextTiles.find(tile => tile.id === draggedTileId);
+            const draggedTile = nextTiles.find(tile => tile.id === active.id);
             if (draggedTile) {
                 draggedTile.positionId = destinationColumnId; // Set the new position ID
             }
@@ -672,17 +679,17 @@ function App() {
              // Remove dragged tile from source column
              nextColumns[sourcePositionId] = {
                  ...columns[sourcePositionId],
-                 tileIds: columns[sourcePositionId].tileIds.filter(id => id !== draggedTileId),
+                 tileIds: columns[sourcePositionId].tileIds.filter(id => id !== active.id),
              };
 
              // Place dragged tile in destination column (it's empty, so just add it)
              nextColumns[destinationColumnId] = {
                  ...columns[destinationColumnId],
-                 tileIds: [draggedTileId], // Destination now contains only the dragged tile
+                 tileIds: [active.id], // Destination now contains only the dragged tile
              };
 
              // Update the positionId for the dragged tile
-             const draggedTile = nextTiles.find(tile => tile.id === draggedTileId);
+             const draggedTile = nextTiles.find(tile => tile.id === active.id);
              if (draggedTile) {
                  draggedTile.positionId = destinationColumnId; // Set the new position ID
              }
@@ -708,10 +715,10 @@ function App() {
              // Dropped over a specific tile within the unassigned list
              dropIndexInUnassigned = currentUnassignedTileIds.indexOf(droppedOverTileInUnassigned.id);
              // Adjust index if moving within unassigned and dropping below original position
-             if (sourcePositionId === POSITIONS.UNASSIGNED && currentUnassignedTileIds.indexOf(draggedTileId) !== -1 && dropIndexInUnassigned > currentUnassignedTileIds.indexOf(draggedTileId)) {
+             if (sourcePositionId === POSITIONS.UNASSIGNED && currentUnassignedTileIds.indexOf(active.id) !== -1 && dropIndexInUnassigned > currentUnassignedTileIds.indexOf(active.id)) {
                  dropIndexInUnassigned--;
              }
-        } else if (overId === POSITIONS.UNASSIGNED) { // Explicitly check if dropped on the Unassigned container
+        } else if (over.id === POSITIONS.UNASSIGNED) { // Explicitly check if dropped on the Unassigned container
              // Dropped directly onto the Unassigned column container
              dropIndexInUnassigned = currentUnassignedTileIds.length; // Add to the end
         } else {
@@ -731,7 +738,7 @@ function App() {
          if (sourcePositionId !== POSITIONS.UNASSIGNED) {
              nextColumns[sourcePositionId] = {
                  ...columns[sourcePositionId],
-                 tileIds: columns[sourcePositionId].tileIds.filter(id => id !== draggedTileId),
+                 tileIds: columns[sourcePositionId].tileIds.filter(id => id !== active.id),
              };
 
               // Update rows for tiles remaining in the source column after the drag
@@ -750,16 +757,16 @@ function App() {
          if (sourcePositionId !== POSITIONS.UNASSIGNED) {
              // Adding a tile from another column to Unassigned
              newUnassignedTileIds = Array.from(currentUnassignedTileIds);
-             newUnassignedTileIds.splice(dropIndexInUnassigned, 0, draggedTileId); // Insert at the determined index
+             newUnassignedTileIds.splice(dropIndexInUnassigned, 0, active.id); // Insert at the determined index
              
              // Update the positionId for the dragged tile
-             const draggedTile = nextTiles.find(tile => tile.id === draggedTileId);
+             const draggedTile = nextTiles.find(tile => tile.id === active.id);
              if (draggedTile) {
                  draggedTile.positionId = POSITIONS.UNASSIGNED;
              }
          } else {
              // Moving within the unassigned column itself
-             const oldIndex = currentUnassignedTileIds.indexOf(draggedTileId);
+             const oldIndex = currentUnassignedTileIds.indexOf(active.id);
              if (oldIndex !== -1) {
                   newUnassignedTileIds = arrayMove(
                       currentUnassignedTileIds,
@@ -771,7 +778,7 @@ function App() {
                  newUnassignedTileIds = Array.from(currentUnassignedTileIds);
                  
                  // Still update the positionId to be safe
-                 const draggedTile = nextTiles.find(tile => tile.id === draggedTileId);
+                 const draggedTile = nextTiles.find(tile => tile.id === active.id);
                  if (draggedTile) {
                      draggedTile.positionId = POSITIONS.UNASSIGNED;
                  }
