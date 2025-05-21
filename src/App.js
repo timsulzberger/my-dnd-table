@@ -99,17 +99,17 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
   });
 
   // Tailwind classes for styling the tile
-  // baseClasses: Common styles for all tiles (padding, rounded corners, cursor, flex layout, transition, solid black border, touch-action-none)
+  // baseClasses: Common styles for all tiles (padding, rounded corners, cursor, flex layout, transition, light grey border, touch-action-none)
   // Reduced padding for tighter tiles
   // Added touch-action-none to prevent default browser touch behaviors (scrolling, zooming) during drag
-  const baseClasses = `p-1 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-black touch-action-none`;
+  const baseClasses = `p-1 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-gray-300 touch-action-none shadow-sm`;
   
   // State-based classes
   const stateClasses = [
     // Dragging state
-    isDragging ? 'opacity-50 bg-gray-200 border-black shadow-lg' : 'opacity-100 bg-white shadow-sm',
+    isDragging ? 'opacity-80 bg-gray-100 border-gray-400 shadow-md' : 'opacity-100 bg-white',
     // Hover state (when dragged over a valid drop target)
-    isOver && over?.id !== id ? 'ring-2 ring-green-500' : '',
+    isOver && over?.id !== id ? 'ring-2 ring-blue-400' : '',
   ].join(' ');
 
   // positionSpecificClasses: Styles that vary based on the tile's current position (margin, width, text alignment)
@@ -165,16 +165,13 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
     >
       {/* Container for main content, using flex-col for vertical stacking */}
       <div className="flex flex-col flex-grow"> {/* flex-grow allows this section to take up space */}
-          {/* Display the formatted header */}
-          {/* Hide header for unassigned tiles */}
-          {currentPositionId !== POSITIONS.UNASSIGNED && (
-              <div className="font-semibold mb-1 text-gray-700 text-xs">{headerText}</div> // Smaller font for header
-          )}
+          {/* Header text is now hidden for all tiles, but kept in the code for functionality */}
+          {/* The headerText is still calculated and available in the code if needed */}
 
           {/* Paddler Name Input - Using flexbox for label and input on same line */}
           {/* Adjusted spacing and width handling */}
           <div className="mt-0.5 mb-0.5 flex items-center" onMouseDown={handleInputMouseDown}> {/* Added flex and items-center */}
-            <label htmlFor={`paddler-${id}`} className="block text-xs text-gray-600 mr-1 shrink-0">Name:</label> {/* Added mr-1 for spacing, shrink-0 to prevent label shrinking */}
+            <label htmlFor={`paddler-${id}`} className="block text-xs text-gray-600 mr-1 shrink-0" title="Paddler Name">👤</label> {/* Person icon as label with title for accessibility */}
             <input
               id={`paddler-${id}`} // Unique ID for the input, linked to the label
               type="text"
@@ -338,7 +335,7 @@ function UnassignedColumn({ children, id, title, tileIds, selectedFilterPreferen
                 )}
             </div>
 
-            <div className="flex-grow flex flex-col items-center justify-center h-full">
+            <div className="flex-grow flex flex-col items-center h-full">
                 <SortableContext items={tileIds} strategy={verticalListSortingStrategy}>
                     {children}
                 </SortableContext>
