@@ -178,7 +178,7 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
               value={paddlerName} // Controlled input value
               onChange={(e) => onPaddlerNameChange(id, e.target.value)} // Call parent handler on change
               // Removed flex-grow, added w-auto and min-w-0 for better flex behavior, removed focus outline
-              className="p-0.5 rounded border border-gray-300 text-xs text-gray-800 w-auto min-w-0 outline-none" // Removed flex-grow, added w-auto min-w-0, outline-none
+             className="p-0.5 rounded border border-white text-xs text-gray-800 w-auto min-w-0 outline-none"
             />
           </div>
 
@@ -191,7 +191,7 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
               value={preference} // Controlled dropdown value
               onChange={(e) => onPreferenceChange(id, e.target.value)} // Call parent handler on change
               // Removed flex-grow, added w-auto and min-w-0 for better flex behavior, removed focus outline
-              className="p-0.5 rounded border border-gray-300 text-xs text-gray-800 w-auto min-w-0 outline-none" // Removed flex-grow, added w-auto min-w-0, outline-none
+             className="p-0.5 rounded border border-white text-xs text-gray-800 w-auto min-w-0 outline-none"
             >
                 {/* Map over the preference options to create dropdown options */}
                 {PREFERENCE_OPTIONS.map(option => (
