@@ -430,6 +430,35 @@ function App() {
     // Return first collision or fall back to closestCenter
     return collisions.flat().length > 0 ? collisions.flat() : closestCenter(args);
   };
+    // Helper function to ensure all tile IDs are unique
+  const ensureUniqueTileIds = (tilesArray) => {
+    const seenIds = new Set();
+    
+    return tilesArray.map((tile, index) => {
+      if (!tile || !tile.id) {
+        console.error('Invalid tile in ensureUniqueTileIds:', tile);
+        return { ...tile, id: `tile-${index}` }; // Generate new ID for invalid tiles
+      }
+      
+      // Only generate new ID if there's a duplicate
+      let newId = tile.id;
+      let counter = 1;
+      
+      // If the ID is already in use, generate a new one
+      while (seenIds.has(newId)) {
+        newId = `${tile.id}-${counter++}`;
+      }
+      
+      seenIds.add(newId);
+      return { ...tile, id: newId };
+    });
+  };
+  
+  // Function to generate a new unique tile ID
+  const generateNewTileId = (baseId = 'tile') => {
+    return `${baseId}-${Math.random().toString(36).substr(2, 6)}`;
+  };
+
   // State to hold the array of all tiles
   const [tiles, setTiles] = useState(initialTiles);
   // State to hold the structure of columns/positions and the IDs of tiles within them
@@ -470,7 +499,7 @@ function App() {
       });
 
       setColumns(initialColumns); // Set the initial columns state
-  }, []); // Empty dependency array ensures this runs only once on mount
+  }, [tiles]); // Run effect when tiles change
 
 
   // State to track the ID of the item currently being dragged (for the DragOverlay)
@@ -492,9 +521,22 @@ function App() {
   // Helper function to find a tile object by its ID
   const getTileById = (id) => tiles.find(tile => tile.id === id);
 
+
+
   // Handler for changes to the Paddler Name input field
   const handlePaddlerNameChange = (tileId, newName) => {
-    // Updates the tiles state by mapping over the existing tiles
+    // Check if the name already exists in any other tile
+    const isNameTaken = tiles.some(tile => 
+      tile.id !== tileId && tile.paddlerName === newName && newName.trim() !== ''
+    );
+
+    if (isNameTaken) {
+      // If name is taken, show an alert and don't update
+      alert('This name is already in use. Please choose a different name.');
+      return;
+    }
+
+    // If name is not taken, update the tiles state
     setTiles(prevTiles =>
       prevTiles.map(tile =>
         // If the tile ID matches, update its paddlerName; otherwise, return the tile unchanged
@@ -648,7 +690,7 @@ function App() {
                 ...columns[destinationColumnId],
                 tileIds: [active.id], // Destination now contains only the dragged tile
             };
-            // Update the positionId for the dragged tile in the nextTiles state
+            // Update the position for the dragged tile
             const draggedTile = nextTiles.find(tile => tile.id === active.id);
             if (draggedTile) {
                 draggedTile.positionId = destinationColumnId; // Set the new position ID
@@ -797,12 +839,30 @@ function App() {
                if(tileToUpdate) tileToUpdate.row = index;
            });
 
+           // Ensure all tile IDs are unique before updating state
+           const uniqueTiles = ensureUniqueTileIds(nextTiles);
+           
+           // Also ensure the tile IDs in the columns reference the updated tile IDs
+           const updatedColumns = { ...nextColumns };
+           Object.keys(updatedColumns).forEach(columnId => {
+             updatedColumns[columnId] = {
+               ...updatedColumns[columnId],
+               tileIds: updatedColumns[columnId].tileIds
+                 .map(tileId => {
+                   const tile = uniqueTiles.find(t => t.id === tileId || t.id.startsWith(`${tileId}-`));
+                   return tile ? tile.id : tileId;
+                 })
+                 .filter(Boolean) // Remove any undefined entries
+             };
+           });
 
-       // Update state with the new columns and tiles data
-       setColumns(nextColumns);
-       setTiles(nextTiles);
+           // Update state with the new columns and tiles data
+           setColumns(updatedColumns);
+           setTiles(uniqueTiles);
     }
   };
+
+   // Using the ensureUniqueTileIds function defined earlier in the file
 
    // Handler for when a drag operation is cancelled
    const onDragCancel = () => {
