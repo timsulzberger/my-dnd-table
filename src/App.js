@@ -71,7 +71,7 @@ const initialTiles = Array.from({ length: 22 }, (v, k) => {
     // Removed original content field as it's no longer displayed
     // content: `Tile ${k + 1}`, // Content displayed on the tile
     preference: 'Null', // Added preference field, initially 'Null'
-    positionId: positionId, // Stores the tile's current position ID
+    positionId: positionId, // Stores className="p-0.5 rounded border border-gray-300 text-xs text-gray-800 w-auto min-w-0 outline-none"className="p-0.5 rounded border border-white text-xs text-gray-800 w-auto min-w-0 outline-none"className="p-0.5 rounded border border-gray-300 text-xs text-gray-800 w-auto min-w-0className="p-0.5 rounded border border-white text-xs text-gray-800 w-auto min-w-0 outline-none"the tile's current position ID
     paddlerName: `Person ${k + 1}`, // Default paddler name
   };
 });
@@ -102,7 +102,7 @@ function SortableItem({ id, paddlerName, preference, currentPositionId, currentI
   // baseClasses: Common styles for all tiles (padding, rounded corners, cursor, flex layout, transition, light grey border, touch-action-none)
   // Reduced padding for tighter tiles
   // Added touch-action-none to prevent default browser touch behaviors (scrolling, zooming) during drag
-  const baseClasses = `p-1 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-gray-300 touch-action-none shadow-sm`;
+  const baseClasses = `p-1 rounded-md select-none cursor-grab flex flex-col transition-all duration-200 ease-in-out border border-gray-300 touch-action-none shadow-sm border-l-4 border-blue-500`;
   
   // State-based classes
   const stateClasses = [
@@ -663,80 +663,96 @@ function App() {
     const isSingleTileDestination = destinationColumnId !== POSITIONS.UNASSIGNED;
 
     if (isSingleTileDestination) {
+      if (isSingleTileDestination) {
         // Check if the destination zone is already occupied
         if (destinationTileIds.length > 0) {
             console.log(`Destination ${destinationColumnId} is occupied. Moving original tile to Unassigned.`);
-
+    
             const originalTileId = destinationTileIds[0]; // Get the ID of the tile currently in the destination
-
+    
             // Calculate the next state for columns and tiles
             const nextColumns = { ...columns };
             const nextTiles = [...tiles];
-
-            // Remove dragged tile from source column
-            nextColumns[sourcePositionId] = {
-                ...columns[sourcePositionId],
-                tileIds: columns[sourcePositionId].tileIds.filter(id => id !== active.id),
-            };
-
+    
+            // Remove dragged tile from source column (if it's not already being moved from Unassigned)
+            if (sourcePositionId !== POSITIONS.UNASSIGNED) {
+                nextColumns[sourcePositionId] = {
+                    ...columns[sourcePositionId],
+                    tileIds: columns[sourcePositionId].tileIds.filter(id => id !== active.id),
+                };
+            } else {
+                // If moving from Unassigned, remove from the Unassigned column
+                nextColumns[POSITIONS.UNASSIGNED] = {
+                    ...columns[POSITIONS.UNASSIGNED],
+                    tileIds: columns[POSITIONS.UNASSIGNED].tileIds.filter(id => id !== active.id),
+                };
+            }
+    
             // Add original tile to unassigned column (at the end)
             nextColumns[POSITIONS.UNASSIGNED] = {
                 ...columns[POSITIONS.UNASSIGNED],
-                tileIds: [...columns[POSITIONS.UNASSIGNED].tileIds, originalTileId],
+                tileIds: [...columns[POSITIONS.UNASSIGNED].tileIds.filter(id => id !== active.id), originalTileId],
             };
-
-            // Place dragged tile in destination column (it's a single-tile zone, so replace content)
+    
+            // Place dragged tile in destination column
             nextColumns[destinationColumnId] = {
                 ...columns[destinationColumnId],
-                tileIds: [active.id], // Destination now contains only the dragged tile
+                tileIds: [active.id],
             };
+    
             // Update the position for the dragged tile
             const draggedTile = nextTiles.find(tile => tile.id === active.id);
             if (draggedTile) {
-                draggedTile.positionId = destinationColumnId; // Set the new position ID
+                draggedTile.positionId = destinationColumnId;
             }
-
+    
             // Update the positionId for the original tile that was moved to Unassigned
             const originalTile = nextTiles.find(tile => tile.id === originalTileId);
             if (originalTile) {
-                originalTile.positionId = POSITIONS.UNASSIGNED; // Set the new position ID
+                originalTile.positionId = POSITIONS.UNASSIGNED;
             }
-
+    
             // Update state with the new columns and tiles data
             setColumns(nextColumns);
             setTiles(nextTiles);
-
-
         } else {
-             // Destination is a single-tile zone and is empty
-             console.log(`Destination ${destinationColumnId} is empty. Placing dragged tile.`);
-
-             // Calculate the next state for columns and tiles
-             const nextColumns = { ...columns };
-             const nextTiles = [...tiles];
-
-             // Remove dragged tile from source column
-             nextColumns[sourcePositionId] = {
-                 ...columns[sourcePositionId],
-                 tileIds: columns[sourcePositionId].tileIds.filter(id => id !== active.id),
-             };
-
-             // Place dragged tile in destination column (it's empty, so just add it)
-             nextColumns[destinationColumnId] = {
-                 ...columns[destinationColumnId],
-                 tileIds: [active.id], // Destination now contains only the dragged tile
-             };
-
-             // Update the positionId for the dragged tile
-             const draggedTile = nextTiles.find(tile => tile.id === active.id);
-             if (draggedTile) {
-                 draggedTile.positionId = destinationColumnId; // Set the new position ID
-             }
-
-             // Update state with the new columns and tiles data
-             setColumns(nextColumns);
-             setTiles(nextTiles);
+            // Destination is a single-tile zone and is empty
+            console.log(`Destination ${destinationColumnId} is empty. Placing dragged tile.`);
+    
+            // Calculate the next state for columns and tiles
+            const nextColumns = { ...columns };
+            const nextTiles = [...tiles];
+    
+            // Remove dragged tile from source column (whether it's from Unassigned or another position)
+            if (sourcePositionId === POSITIONS.UNASSIGNED) {
+                nextColumns[POSITIONS.UNASSIGNED] = {
+                    ...columns[POSITIONS.UNASSIGNED],
+                    tileIds: columns[POSITIONS.UNASSIGNED].tileIds.filter(id => id !== active.id),
+                };
+            } else if (sourcePositionId) {
+                nextColumns[sourcePositionId] = {
+                    ...columns[sourcePositionId],
+                    tileIds: columns[sourcePositionId].tileIds.filter(id => id !== active.id),
+                };
+            }
+    
+            // Place dragged tile in destination column
+            nextColumns[destinationColumnId] = {
+                ...columns[destinationColumnId],
+                tileIds: [active.id],
+            };
+    
+            // Update the positionId for the dragged tile
+            const draggedTile = nextTiles.find(tile => tile.id === active.id);
+            if (draggedTile) {
+                draggedTile.positionId = destinationColumnId;
+            }
+    
+            // Update state with the new columns and tiles data
+            setColumns(nextColumns);
+            setTiles(nextTiles);
         }
+    }
 
 
     } else {
